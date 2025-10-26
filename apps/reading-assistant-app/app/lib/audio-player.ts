@@ -9,6 +9,8 @@ export class AudioPlayer {
   private isPlaying = false;
   private currentSource: AudioBufferSourceNode | null = null;
   private onQueueEmptyCallback: (() => void) | null = null;
+  private waitingForQueue: 'reading' | 'answering' | null = null;
+
   private allowReadingPlayback = true;
 
   constructor() {
@@ -23,9 +25,11 @@ export class AudioPlayer {
     this.processAndQueueChunk(data, 'answering');
   }
 
-  public onQueueEmpty(callback: () => void): void {
+  public onQueueEmpty(callback: () => void, queueType: 'reading' | 'answering' = 'answering'): void {
   console.log("🎯 onQueueEmpty registered, isPlaying:", this.isPlaying, "answeringQueue:", this.answeringAudioQueue.length); // ✅ Debug
   this.onQueueEmptyCallback = callback;
+  this.waitingForQueue = queueType;
+
   // ❌ Remove the immediate check - let playFromQueues handle it
   }
   public setAllowReadingPlayback(allow: boolean): void {
@@ -70,11 +74,18 @@ private playFromQueues = (): void => {
     if (activeQueue.length === 0) {
       console.log("🔇 Queue empty! Firing callback. isPlaying:", this.isPlaying);
       this.isPlaying = false;
-      if (this.onQueueEmptyCallback) {
-        this.onQueueEmptyCallback();
-        this.onQueueEmptyCallback = null;
+       if (this.onQueueEmptyCallback) {
+        const shouldFire = 
+          (this.waitingForQueue === 'answering' && this.answeringAudioQueue.length === 0) ||
+          (this.waitingForQueue === 'reading' && this.readingAudioQueue.length === 0);
+        
+        if (shouldFire) {
+          console.log("🔔 Firing callback for", this.waitingForQueue, "queue");
+          this.onQueueEmptyCallback();
+          this.onQueueEmptyCallback = null;
+          this.waitingForQueue = null;
+        }
       }
-      return;
     }
 
     this.isPlaying = true;

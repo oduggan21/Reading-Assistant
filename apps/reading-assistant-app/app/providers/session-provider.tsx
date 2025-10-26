@@ -191,9 +191,15 @@ export function SessionProvider({ children }: SessionProviderProps) {
       });
 
       wsClientRef.current.on("readingEnded", () => {
+      console.log("📢 Backend finished sending reading audio");
+      
+      // ✅ Specify we're waiting for the READING queue
+      audioPlayerRef.current?.onQueueEmpty(() => {
+        console.log("🎬 All reading audio has finished playing");
         store.getState().setStatus("ended");
         store.getState().setInterruptible(false);
-      });
+      }, 'reading'); // ✅ Specify 'reading' queue
+    });
 
       wsClientRef.current.on("serverError", (message) => {
         console.error("Server Error:", message);
