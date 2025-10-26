@@ -1,0 +1,9 @@
+/*
+ * This is the main stylesheet for the application.
+ * It uses the @tailwind directive to include Tailwind's base styles,
+ * component classes, and utility classes.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

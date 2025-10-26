@@ -1,0 +1,12 @@
+[package]
+name = "reading_assistant_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# These dependencies now inherit their versions from the [workspace.dependencies]
+# section in the top-level Cargo.toml file.
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+futures = "0.3.30"

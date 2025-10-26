@@ -1,0 +1,28 @@
+# docker-compose.yml
+# This file defines the services, networks, and volumes for local development.
+# Run `docker-compose --env-file services/api/.env up -d` to start the services.
+
+services:
+  # Defines our PostgreSQL database service
+  postgres:
+    image: postgres:15 # Use a specific, stable version of the official Postgres image
+    container_name: reading_assistant_db
+    environment:
+      # These variables are read from the .env file in the `services/api` directory
+      # and are used by the Postgres image to initialize the database and user.
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      # Maps the host machine's port 5432 to the container's port 5432,
+      # allowing our API service to connect to it via `localhost:5432`.
+      - "5432:5432"
+    volumes:
+      # This creates a "named volume" to persist the database data on the host machine.
+      # If the container is stopped or removed, the data will still be there when you
+      # start it again.
+      - reading-assistant-data:/var/lib/postgresql/data
+
+volumes:
+  # Defines the named volume used by the postgres service.
+  reading-assistant-data:

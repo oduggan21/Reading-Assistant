@@ -1,0 +1,20 @@
+{
+  "name": "reading-assistant-monorepo",
+  "version": "1.0.0",
+  "description": "A monorepo for the Reading Assistant full-stack application.",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "dev:app": "pnpm --filter reading-assistant-app dev",
+    "generate:api-client": "orval --config ./orval.config.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.12.4",
+  "devDependencies": {
+    "@orval/core": "^7.11.2",
+    "orval": "^7.11.2",
+    "typescript": "^5.0.0"
+  }
+}

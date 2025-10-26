@@ -1,0 +1,27 @@
+{
+  "include": [
+    // This broader pattern is more robust and matches the feynman project.
+    // It includes all files within the app directory.
+    "**/*"
+  ],
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["vite/client"],
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./app/*"],
+      "@reading-assistant/ui/*": ["../../packages/ui/src/*"],
+      "@reading-assistant/query/*": ["../../packages/reading-assistant-query/src/*"]
+    },
+    "esModuleInterop": true,
+    "strict": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  }
+}
+

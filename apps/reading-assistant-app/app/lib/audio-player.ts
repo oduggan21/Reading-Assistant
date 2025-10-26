@@ -1,0 +1,113 @@
+// The sample rate must match the output from the backend's TTS service.
+// OpenAI's default is 24000.
+const SAMPLE_RATE = 24000;
+
+export class AudioPlayer {
+  private audioContext: AudioContext;
+  private readingAudioQueue: AudioBuffer[] = [];
+  private answeringAudioQueue: AudioBuffer[] = [];
+  private isPlaying = false;
+  private currentSource: AudioBufferSourceNode | null = null;
+  private onQueueEmptyCallback: (() => void) | null = null;
+  private allowReadingPlayback = true;
+
+  constructor() {
+    this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+  }
+
+  public addReadingChunk(data: ArrayBuffer): void {
+    this.processAndQueueChunk(data, 'reading');
+  }
+
+  public addAnsweringChunk(data: ArrayBuffer): void {
+    this.processAndQueueChunk(data, 'answering');
+  }
+
+  public onQueueEmpty(callback: () => void): void {
+  console.log("🎯 onQueueEmpty registered, isPlaying:", this.isPlaying, "answeringQueue:", this.answeringAudioQueue.length); // ✅ Debug
+  this.onQueueEmptyCallback = callback;
+  // ❌ Remove the immediate check - let playFromQueues handle it
+  }
+  public setAllowReadingPlayback(allow: boolean): void {
+    this.allowReadingPlayback = allow;
+    if (!allow && this.isPlaying) {
+      // If we're currently playing reading audio, pause it
+      this.pause();
+    }
+  }
+
+  private async processAndQueueChunk(
+  data: ArrayBuffer,
+  queueType: 'reading' | 'answering'
+): Promise<void> {
+  try {
+    // ✅ Decode the MP3/audio data properly using Web Audio API
+    const audioBuffer = await this.audioContext.decodeAudioData(data.slice(0));
+    
+    if (queueType === 'reading') {
+      this.readingAudioQueue.push(audioBuffer);
+    } else {
+      this.answeringAudioQueue.push(audioBuffer);
+    }
+
+    if (!this.isPlaying) {
+      this.playFromQueues();
+    }
+  } catch (error) {
+    console.error("Error processing audio chunk:", error);
+  }
+}
+
+private playFromQueues = (): void => {
+    this.currentSource = null;
+    
+    // ✅ Prioritize answering queue, but only use reading queue if allowed
+    const activeQueue =
+      this.answeringAudioQueue.length > 0
+        ? this.answeringAudioQueue
+        : (this.allowReadingPlayback ? this.readingAudioQueue : []);
+
+    if (activeQueue.length === 0) {
+      console.log("🔇 Queue empty! Firing callback. isPlaying:", this.isPlaying);
+      this.isPlaying = false;
+      if (this.onQueueEmptyCallback) {
+        this.onQueueEmptyCallback();
+        this.onQueueEmptyCallback = null;
+      }
+      return;
+    }
+
+    this.isPlaying = true;
+    const bufferToPlay = activeQueue.shift()!;
+    const source = this.audioContext.createBufferSource();
+    source.buffer = bufferToPlay;
+    source.connect(this.audioContext.destination);
+    source.onended = this.playFromQueues;
+    source.start();
+    this.currentSource = source;
+  };
+
+  /**
+   * Immediately stops the current playback but PRESERVES the audio queues.
+   * This is used for interruptions and pausing.
+   */
+  public pause(): void {
+    if (this.currentSource) {
+      // Disconnect the onended event to prevent the next item from playing automatically.
+      this.currentSource.onended = null;
+      this.currentSource.stop();
+      this.currentSource = null;
+    }
+    this.isPlaying = false;
+  }
+
+  /**
+   * Immediately stops playback and CLEARS all audio queues.
+   * This is used when the session is completely disconnected or ended.
+   */
+  public stopAndClear(): void {
+    this.pause(); // Stop any current playback first.
+    this.readingAudioQueue = [];
+    this.answeringAudioQueue = [];
+  }
+}

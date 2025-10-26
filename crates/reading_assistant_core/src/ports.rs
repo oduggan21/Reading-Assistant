@@ -1,0 +1,83 @@
+//! crates/reading_assistant_core/src/ports.rs
+//!
+//! Defines the service contracts (traits) for the application's core logic.
+//! These traits form the boundary of the hexagonal architecture, allowing the core
+//! to be independent of specific external implementations like databases or APIs.
+
+use async_trait::async_trait;
+use uuid::Uuid;
+use futures::Stream;
+use std::pin::Pin;
+use crate::domain::{Document, Note, QAPair, Session, User};
+
+//=========================================================================================
+// Generic Port Error and Result Types
+//=========================================================================================
+
+/// A generic error type for all port operations.
+/// This abstracts away the specific errors from external services (e.g., database, network).
+#[derive(Debug, thiserror::Error)]
+pub enum PortError {
+    #[error("Item not found: {0}")]
+    NotFound(String),
+    #[error("An unexpected error occurred: {0}")]
+    Unexpected(String),
+}
+
+/// A convenience type alias for `Result<T, PortError>`.
+pub type PortResult<T> = Result<T, PortError>;
+
+//=========================================================================================
+// Service Ports (Traits)
+//=========================================================================================
+
+#[async_trait]
+pub trait DatabaseService: Send + Sync {
+    // --- User Management ---
+    async fn get_or_create_user(&self, user_id: Uuid) -> PortResult<User>;
+
+    // --- Document Management ---
+    async fn get_document_by_id(&self, document_id: Uuid) -> PortResult<Document>;
+    /// Creates a new document in the database for a given user.
+    async fn create_document(&self, user_id: Uuid, title: &str, original_text: &str) -> PortResult<Document>;
+
+    // --- Session Management ---
+    async fn get_session_by_id(&self, session_id: Uuid) -> PortResult<Session>;
+    async fn create_session(&self, user_id: Uuid, document_id: Uuid) -> PortResult<Session>;
+    async fn update_session_progress(&self, session_id: Uuid, new_progress_index: usize) -> PortResult<()>;
+
+    // --- Q&A and Note Management ---
+    async fn save_qa_pair(&self, qa_pair: QAPair) -> PortResult<()>;
+    async fn get_qa_pairs_for_session(&self, session_id: Uuid) -> PortResult<Vec<QAPair>>;
+    async fn save_note(&self, note: Note) -> PortResult<()>;
+    async fn get_notes_for_session(&self, session_id: Uuid) -> PortResult<Vec<Note>>;
+}
+
+#[async_trait]
+pub trait SpeechToTextService: Send + Sync {
+    /// Transcribes a slice of audio data into text.
+    async fn transcribe_audio(&self, audio_data: &[u8]) -> PortResult<String>;
+}
+
+#[async_trait]
+pub trait TextToSpeechService: Send + Sync {
+    /// Generates audio data from a string of text.
+    async fn generate_audio(&self, text: &str) -> PortResult<Vec<u8>>;
+}
+
+#[async_trait]
+pub trait QuestionAnsweringService: Send + Sync {
+    /// Answers a question based on a provided context.
+    async fn answer_question(&self, question: &str, context: &str) -> PortResult<String>;
+    async fn answer_question_streaming(
+        &self,
+        question: &str,
+        context: &str,
+    ) -> PortResult<Pin<Box<dyn Stream<Item = Result<String, PortError>> + Send>>>;
+}
+
+#[async_trait]
+pub trait NoteGenerationService: Send + Sync {
+    /// Generates a concise note from a QAPair.
+    async fn generate_note_from_qapair(&self, qapair: &QAPair) -> PortResult<String>;
+}

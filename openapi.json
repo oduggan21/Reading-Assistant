@@ -1,0 +1,90 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "api",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/sessions": {
+      "post": {
+        "tags": [],
+        "summary": "Create a new session by uploading a document.",
+        "description": "Accepts a multipart/form-data request with a single file part.\nA `x-user-id` header is required to associate the session with a user.",
+        "operationId": "create_session_handler",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "The unique ID of the user.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The document to upload.",
+          "content": {
+            "multipart/form-data": {}
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (e.g., missing header or file)"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateSessionResponse": {
+        "type": "object",
+        "description": "The response payload sent after successfully creating a session.",
+        "required": [
+          "session_id",
+          "document_id",
+          "user_id"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Reading Assistant API",
+      "description": "API endpoints for the interactive audio reader."
+    }
+  ]
+}

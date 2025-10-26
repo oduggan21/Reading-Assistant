@@ -1,0 +1,11 @@
+pub mod protocol;
+pub mod qa_task;
+pub mod reading_task;
+pub mod state;
+pub mod ws_handler;
+pub mod rest;
+
+// Re-export the main WebSocket handler to make it easily accessible
+// to the binary that will build the web server router.
+pub use ws_handler::ws_handler;
+pub use rest::create_session_handler;
