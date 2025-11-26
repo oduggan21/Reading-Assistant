@@ -36,20 +36,6 @@ pub async fn reading_process(
         ));
     }
 
-    let welcome_text = "Hi there! I am looking forward to discussing the information you have provided today! If at any point you have a question, please feel free to interrupt me, or if you need to pause our session, just click pause! I will now begin reading the information!";
-    
-    info!("🎤 Generating welcome message...");
-    let welcome_audio = app_state
-        .tts_adapter
-        .generate_audio(welcome_text)
-        .await?;
-    
-    if ws_sender.lock().await.send(Message::Binary(welcome_audio.into())).await.is_err() {
-        return Err(PortError::Unexpected(
-            "Failed to send welcome audio.".to_string(),
-        ));
-    }
-
     loop {
         if cancellation_token.is_cancelled() {
             info!("Reading process cancelled.");

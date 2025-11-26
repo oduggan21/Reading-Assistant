@@ -56,6 +56,20 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>) {
                             error!("Failed to send session initialized message.");
                             return;
                         }
+                        let welcome_text = "Hi there! I am looking forward to discussing the information you have provided today! If at any point you have a question, please feel free to interrupt me, or if you need to pause our session, just click pause! I will now begin reading the information!";
+                
+                        match app_state.tts_adapter.generate_audio(welcome_text).await {
+                            Ok(welcome_audio) => {
+                                if ws_sender.lock().await.send(Message::Binary(welcome_audio.into())).await.is_err() {
+                                    error!("Failed to send welcome audio.");
+                                    return;
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to generate welcome audio: {:?}", e);
+                                return;
+                            }
+                        }
                     }
                     Err(e) => {
                         error!("Failed to initialize session state: {:?}", e);
@@ -169,6 +183,20 @@ async fn handle_text_message(
                     Ok(QaOutcome::ResumeReading) => {
                         info!("QA process resulted in ResumeReading. Restarting reading task.");
                         let mut session = session_state_lock.lock().await;
+                            // Check if all audio already generated
+                            if session.reading_progress_index >= session.chunked_document.len() {
+                                info!("All audio already generated, just resuming frontend playback");
+                                let start_msg = ServerMessage::ReadingStarted;
+                                let start_json = serde_json::to_string(&start_msg).unwrap();
+                                if ws_sender.lock().await.send(Message::Text(start_json.into())).await.is_err() {
+                                    error!("Failed to send ReadingStarted message.");
+                                }
+                                if ws_sender.lock().await.send(Message::Binary(vec![].into())).await.is_err() {
+                                    error!("Failed to send empty audio trigger.");
+                                }
+                        } 
+                        else{
+                        info!("We entered into here");
                         session.current_mode = SessionMode::Reading;
                         session.cancellation_token = CancellationToken::new();
                         let task = {
@@ -177,12 +205,14 @@ async fn handle_text_message(
                             let ws_sender = ws_sender.clone();
                             let token = session.cancellation_token.clone();
                             tokio::spawn(async move {
+                                info!("reading task being started");
                                 if let Err(e) = reading_process(app_state, session_state_lock, ws_sender, token).await {
                                     error!("Reading process failed: {:?}", e);
                                 }
                             })
                         };
                         *reading_task_handle = Some(task);
+                    }
                     }
                     Ok(QaOutcome::QuestionAnswered) => {
                         info!("QA process resulted in QuestionAnswered. Awaiting next interrupt.");
@@ -203,9 +233,22 @@ async fn handle_text_message(
                 session.current_mode = SessionMode::Paused;
             }
             ClientMessage::ResumeReading => {
-                info!("ResumeReading message received.");
-                let mut session = session_state_lock.lock().await;
-                if session.current_mode == SessionMode::Paused {
+            info!("ResumeReading message received.");
+            let mut session = session_state_lock.lock().await;
+            if session.current_mode == SessionMode::Paused {
+                // Check if all audio already generated
+                if session.reading_progress_index >= session.chunked_document.len() {
+                    info!("All audio already generated, just resuming frontend playback");
+                    let start_msg = ServerMessage::ReadingStarted;
+                    let start_json = serde_json::to_string(&start_msg).unwrap();
+                    if ws_sender.lock().await.send(Message::Text(start_json.into())).await.is_err() {
+                        error!("Failed to send ReadingStarted message.");
+                    }
+                    if ws_sender.lock().await.send(Message::Binary(vec![].into())).await.is_err() {
+                        error!("Failed to send empty audio trigger.");
+                    }
+                } else {
+                    // Still have sentences to generate
                     session.current_mode = SessionMode::Reading;
                     session.cancellation_token = CancellationToken::new();
                     let task = {
@@ -222,6 +265,7 @@ async fn handle_text_message(
                     *reading_task_handle = Some(task);
                 }
             }
+        }
             ClientMessage::Init { .. } => {
                 warn!("Received subsequent Init message, which is ignored.");
             }

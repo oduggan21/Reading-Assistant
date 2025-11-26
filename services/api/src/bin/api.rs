@@ -81,7 +81,7 @@ async fn main() -> Result<(), ApiError> {
     };
     let tts_adapter = Arc::new(OpenAiTtsAdapter::new(
         openai_client.clone(),
-        SpeechModel::Tts1,
+        SpeechModel::Tts1Hd,
         tts_voice,
     ));
 
