@@ -45,7 +45,7 @@ impl NoteGenerationService for OpenAiNotesAdapter {
     async fn generate_note_from_qapair(&self, qapair: &QAPair) -> PortResult<String> {
         let messages = vec![
             ChatCompletionRequestSystemMessageArgs::default()
-                .content("You are a note-taking assistant. Your task is to summarize the following question and answer into a single, concise note. The note should capture the key insight or piece of information from the exchange. Present it as a single bullet point or a short sentence.")
+                .content("You are a note-taking assistant. Your task is to summarize the following question and answer into a single, concise note.  The note should capture the key insight or piece of information from the exchange. Present it as a single bullet point or a short sentence.")
                 .build()
                 .map_err(|e| PortError::Unexpected(e.to_string()))?
                 .into(),

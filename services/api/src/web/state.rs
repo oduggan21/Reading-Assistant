@@ -49,6 +49,8 @@ pub struct SessionState {
     pub reading_progress_index: usize,
     pub current_mode: SessionMode,
     pub audio_buffer: Vec<u8>,
+    pub last_question: Option<String>,
+    pub last_answer: Option<String>,
     /// A token to gracefully cancel the current reading task.
     pub cancellation_token: CancellationToken,
 }
@@ -76,6 +78,8 @@ impl SessionState {
             reading_progress_index: session_domain.reading_progress_index,
             current_mode: SessionMode::Reading,
             audio_buffer: Vec::new(),
+            last_question: None,
+            last_answer: None,
             // The token is initialized here for the first reading task.
             cancellation_token: CancellationToken::new(),
         })

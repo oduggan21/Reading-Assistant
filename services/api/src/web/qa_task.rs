@@ -50,11 +50,22 @@ pub async fn qa_process(
     }
 
     let (audio_buffer, context, session_id) = {
-        let mut session = session_state_lock.lock().await;
-        let audio_buffer = std::mem::take(&mut session.audio_buffer);
-        let context = get_context_from_document(&session);
-        let session_id = session.session_id;
-        (audio_buffer, context, session_id)
+    let mut session = session_state_lock.lock().await;
+    let audio_buffer = std::mem::take(&mut session.audio_buffer);
+    
+    // Build context using helper function
+    let doc_context = get_context_from_document(&session);
+    let context = if let (Some(prev_q), Some(prev_a)) = (&session.last_question, &session.last_answer) {
+        format!(
+            "DOCUMENT CONTEXT:\n{}\n\nPREVIOUS Q&A:\nQ: {}\nA: {}",
+            doc_context, prev_q, prev_a
+        )
+    } else {
+        doc_context
+    };
+    
+    let session_id = session.session_id;
+    (audio_buffer, context, session_id)
     };
 
     let stt_start = Instant::now();
@@ -83,6 +94,11 @@ pub async fn qa_process(
     let llm_duration = llm_start.elapsed();
     info!("⏱️ LLM took: {:?}", llm_duration);
     info!("Generated answer: '{}'", answer_text);
+    {
+    let mut session = session_state_lock.lock().await;
+    session.last_question = Some(question_text.clone());
+    session.last_answer = Some(answer_text.clone());
+    }
 
     let notes_app_state = app_state.clone();
     let qapair = QAPair {
@@ -170,8 +186,23 @@ fn split_into_sentences(text: &str) -> Vec<String> {
 /// A helper function to extract the last few sentences of context from the document.
 fn get_context_from_document(session: &SessionState) -> String {
     let current_index = session.reading_progress_index;
-    let start_index = current_index.saturating_sub(3);
-    session.chunked_document[start_index..current_index].join(" ")
+    let total_sentences = session.chunked_document.len();
+    
+    // Calculate 10-sentence window around current position
+    let start_index = if current_index < 5 {
+        // Near start: window from 0
+        0
+    } else if current_index + 5 >= total_sentences {
+        // Near end: last 10 sentences
+        total_sentences.saturating_sub(10)
+    } else {
+        // Middle: center around current position
+        current_index - 5
+    };
+    
+    let end_index = (start_index + 10).min(total_sentences);
+    
+    session.chunked_document[start_index..end_index].join(" ")
 }
 
 /// A "fire-and-forget" background task to generate and save notes without blocking the user.

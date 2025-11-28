@@ -72,21 +72,22 @@ impl OpenAiQaAdapter {
 impl QuestionAnsweringService for OpenAiQaAdapter {
     /// Answers a user's question based on a provided snippet of text (context).
     async fn answer_question(&self, question: &str, context: &str) -> PortResult<String> {
+
         let messages = vec![
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content("You are an expert tutor. Answer the user's question based on the provided context and any recent information. Be concise and clear. Keep your response limited to 1-2 sentences. Do NOT include any URLs, citations, or references in your answer - only provide the information in natural conversational language.")
-                .build()
-                .map_err(|e| PortError::Unexpected(e.to_string()))?
-                .into(),
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(format!(
-                    "CONTEXT:\n---\n{}\n---\n\nQUESTION: {}",
-                    context, question
-                ))
-                .build()
-                .map_err(|e| PortError::Unexpected(e.to_string()))?
-                .into(),
-        ];
+        ChatCompletionRequestSystemMessageArgs::default()
+            .content("You are a strict validation assistant. Your ONLY job is to check if the question relates to the provided context. The context is about a specific topic. If the question asks about ANYTHING not mentioned in the context, you MUST respond with EXACTLY: 'I'm sorry, I didn't understand your question given the context of what we've read so far. Could you please try asking again?' Do NOT answer unrelated questions. Do NOT use your general knowledge. ONLY answer if the question is directly about something in the context.")
+            .build()
+            .map_err(|e| PortError::Unexpected(e.to_string()))?
+            .into(),
+        ChatCompletionRequestUserMessageArgs::default()
+            .content(format!(
+                "CONTEXT:\n---\n{}\n---\n\nQUESTION: {}\n\nIs this question about something in the context? If NO, respond with the exact rejection message. If YES, answer briefly in 1-2 sentences using ONLY information from the context.",
+                context, question
+            ))
+            .build()
+            .map_err(|e| PortError::Unexpected(e.to_string()))?
+            .into(),
+    ];
 
         let request = CreateChatCompletionRequestArgs::default()
             .model(&self.model)
