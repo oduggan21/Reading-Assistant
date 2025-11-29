@@ -1,9 +1,60 @@
-/*
- * This is the main stylesheet for the application.
- * It uses the @tailwind directive to include Tailwind's base styles,
- * component classes, and utility classes.
- */
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@theme {
+  --radius: 0.625rem;
+
+  /* Light mode colors */
+  /* if you want less pure white, drop lightness a bit: 0.97 instead of 1 */
+  --color-background: oklch(0.97 0.01 264);
+  --color-foreground: oklch(0.129 0.042 264.695);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.129 0.042 264.695);
+  --color-primary: oklch(0.208 0.042 265.755);
+  --color-primary-foreground: oklch(0.984 0.003 247.858);
+  --color-secondary: oklch(0.968 0.007 247.896);
+  --color-secondary-foreground: oklch(0.208 0.042 265.755);
+  --color-muted: oklch(0.968 0.007 247.896);
+  --color-muted-foreground: oklch(0.554 0.046 257.417);
+  --color-border: oklch(0.929 0.013 255.508);
+  --color-input: oklch(0.929 0.013 255.508);
+  --color-ring: oklch(0.704 0.04 256.788);
+}
+
+@layer base {
+  /* no extra mapping needed for :root – Tailwind uses --color-* already */
+
+  .dark {
+    /* Dark backgrounds */
+    --color-background: oklch(0.15 0.01 264);
+    --color-foreground: oklch(0.98 0.003 264);
+
+    /* Cards */
+    --color-card: oklch(0.18 0.015 264);
+    --color-card-foreground: oklch(0.98 0.003 264);
+
+    /* Light blue primary */
+    --color-primary: oklch(0.65 0.15 250);
+    --color-primary-foreground: oklch(0.15 0.01 264);
+
+    /* Secondary / muted */
+    --color-secondary: oklch(0.25 0.02 264);
+    --color-secondary-foreground: oklch(0.98 0.003 264);
+    --color-muted: oklch(0.25 0.02 264);
+    --color-muted-foreground: oklch(0.65 0.02 264);
+
+    /* Borders / inputs / ring */
+    --color-border: oklch(0.3 0.02 264);
+    --color-input: oklch(0.25 0.02 264);
+    --color-ring: oklch(0.65 0.15 250);
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+}

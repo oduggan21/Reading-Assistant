@@ -159,6 +159,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   const connect = useCallback(
     (sessionId: string) => {
+
+
       if (wsClientRef.current) return;
 
       store.getState().setSessionId(sessionId);
@@ -223,6 +225,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       wsClientRef.current.on("audio", (data) => {
         const { status } = store.getState();
         if (status === "reading") {
+          console.log("Reading chunk added")
           audioPlayerRef.current?.addReadingChunk(data);
         } else if (status === "answering") {
           audioPlayerRef.current?.addAnsweringChunk(data);
@@ -269,6 +272,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   const resumeReading = useCallback(() => {
     audioPlayerRef.current?.setAllowReadingPlayback(true); 
+    store.getState().setStatus("reading");
     wsClientRef.current?.sendResumeReading();
   }, []);
 

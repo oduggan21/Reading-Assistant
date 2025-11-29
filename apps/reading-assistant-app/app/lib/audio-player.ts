@@ -33,18 +33,26 @@ export class AudioPlayer {
   // ❌ Remove the immediate check - let playFromQueues handle it
   }
   public setAllowReadingPlayback(allow: boolean): void {
-    this.allowReadingPlayback = allow;
-    if (!allow && this.isPlaying) {
-      // If we're currently playing reading audio, pause it
-      this.pause();
-    }
+  this.allowReadingPlayback = allow;
+  if (!allow && this.isPlaying) {
+    // If we're currently playing reading audio, pause it
+    this.pause();
   }
+}
 
   private async processAndQueueChunk(
   data: ArrayBuffer,
   queueType: 'reading' | 'answering'
 ): Promise<void> {
+  if (data.byteLength === 0) {
+    console.log("Empty audio trigger received, starting playback");
+    if (!this.isPlaying) {
+      this.playFromQueues();
+    }
+    return;
+  }
   try {
+    console.log("we entered the process and queue")
     // ✅ Decode the MP3/audio data properly using Web Audio API
     const audioBuffer = await this.audioContext.decodeAudioData(data.slice(0));
     
@@ -54,7 +62,9 @@ export class AudioPlayer {
       this.answeringAudioQueue.push(audioBuffer);
     }
 
+    console.log("isPlaying:", this.isPlaying);
     if (!this.isPlaying) {
+      console.log("starting play from queue")
       this.playFromQueues();
     }
   } catch (error) {
@@ -103,14 +113,26 @@ private playFromQueues = (): void => {
    * This is used for interruptions and pausing.
    */
   public pause(): void {
-    if (this.currentSource) {
-      // Disconnect the onended event to prevent the next item from playing automatically.
-      this.currentSource.onended = null;
-      this.currentSource.stop();
-      this.currentSource = null;
+  if (this.currentSource && this.currentSource.buffer) {
+    // Save the current buffer to replay it
+    const currentBuffer = this.currentSource.buffer;
+    
+    // Determine which queue it came from and put it back at the front
+    if (this.allowReadingPlayback && this.answeringAudioQueue.length === 0) {
+      // Was from reading queue
+      this.readingAudioQueue.unshift(currentBuffer);
+    } else if (this.answeringAudioQueue.length > 0 || !this.allowReadingPlayback) {
+      // Was from answering queue
+      this.answeringAudioQueue.unshift(currentBuffer);
     }
-    this.isPlaying = false;
+    
+    // Disconnect the onended event to prevent the next item from playing automatically.
+    this.currentSource.onended = null;
+    this.currentSource.stop();
+    this.currentSource = null;
   }
+  this.isPlaying = false;
+}
 
   /**
    * Immediately stops playback and CLEARS all audio queues.
