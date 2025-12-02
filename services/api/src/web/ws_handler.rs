@@ -17,24 +17,26 @@ use axum::{
         State, WebSocketUpgrade,
     },
     response::Response,
+    Extension,
 };
 use futures::{stream::{SplitSink, StreamExt}, SinkExt};
 use std::sync::Arc;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 /// The handler for upgrading HTTP requests to WebSocket connections.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(app_state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,  // ✅ Add this - from auth middleware
 ) -> Response {
-    ws.on_upgrade(move |socket| handle_socket(socket, app_state))
+    ws.on_upgrade(move |socket| handle_socket(socket, app_state, user_id))  // ✅ Pass user_id
 }
 
-/// The main function that manages a single WebSocket connection's lifecycle.
-async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>) {
-    info!("New WebSocket connection established.");
+async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>, user_id: Uuid) {  // ✅ Add user_id param
+    info!("New WebSocket connection established for user: {}", user_id);
 
     // The sender is wrapped in an Arc<Mutex<>> to allow for shared mutable access across tasks.
     let (sender, mut receiver) = socket.split();
@@ -47,6 +49,31 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>) {
         match serde_json::from_str::<ClientMessage>(&init_json) {
             Ok(ClientMessage::Init { session_id }) => {
                 info!("Initializing session with ID: {}", session_id);
+                
+                // ✅ Validate that the session belongs to this user
+                match app_state.db.get_session_by_id(session_id).await {
+                    Ok(session) => {
+                        if session.user_id != user_id {
+                            error!("Session {} does not belong to user {}", session_id, user_id);
+                            let err_msg = ServerMessage::Error {
+                                message: "Unauthorized: Session does not belong to this user.".to_string(),
+                            };
+                            let err_json = serde_json::to_string(&err_msg).unwrap();
+                            let _ = ws_sender.lock().await.send(Message::Text(err_json.into())).await;
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to get session: {:?}", e);
+                        let err_msg = ServerMessage::Error {
+                            message: "Failed to load session data.".to_string(),
+                        };
+                        let err_json = serde_json::to_string(&err_msg).unwrap();
+                        let _ = ws_sender.lock().await.send(Message::Text(err_json.into())).await;
+                        return;
+                    }
+                }
+                
                 match SessionState::new(app_state.clone(), session_id).await {
                     Ok(state) => {
                         session_state_lock = Arc::new(Mutex::new(state));
@@ -93,7 +120,7 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>) {
     }
 
     // --- 2. Main Message Loop ---
-    // The reading task handle now correctly expects a JoinHandle<()>.
+    // Rest of the function stays exactly the same...
     let mut reading_task_handle: Option<JoinHandle<()>> = {
         let session = session_state_lock.lock().await;
         let task = {
@@ -101,7 +128,6 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>) {
             let session_state_lock = session_state_lock.clone();
             let ws_sender = ws_sender.clone();
             let token = session.cancellation_token.clone();
-            // This spawned task now handles the Result internally and returns (), matching the handle's type.
             tokio::spawn(async move {
                 if let Err(e) = reading_process(app_state, session_state_lock, ws_sender, token).await {
                     error!("Reading process failed: {:?}", e);

@@ -8,7 +8,8 @@ use async_trait::async_trait;
 use uuid::Uuid;
 use futures::Stream;
 use std::pin::Pin;
-use crate::domain::{Document, Note, QAPair, Session, User};
+use chrono::{DateTime, Utc};
+use crate::domain::{Document, Note, QAPair, Session, User, UserCredentials};
 
 //=========================================================================================
 // Generic Port Error and Result Types
@@ -22,6 +23,8 @@ pub enum PortError {
     NotFound(String),
     #[error("An unexpected error occurred: {0}")]
     Unexpected(String),
+    #[error("Unauthorized")]
+    Unauthorized, 
 }
 
 /// A convenience type alias for `Result<T, PortError>`.
@@ -35,21 +38,55 @@ pub type PortResult<T> = Result<T, PortError>;
 pub trait DatabaseService: Send + Sync {
     // --- User Management ---
     async fn get_or_create_user(&self, user_id: Uuid) -> PortResult<User>;
+    
+    // --- Auth Methods ---
+    async fn create_user_with_email(
+        &self,
+        email: &str,
+        hashed_password: &str,
+    ) -> PortResult<User>;
+    
+    async fn get_user_by_email(&self, email: &str) -> PortResult<UserCredentials>;
+    
+    async fn create_auth_session(
+        &self,
+        session_id: &str,
+        user_id: Uuid,
+        expires_at: DateTime<Utc>,
+    ) -> PortResult<()>;
+    
+    async fn validate_auth_session(&self, session_id: &str) -> PortResult<Uuid>;
+    
+    async fn delete_auth_session(&self, session_id: &str) -> PortResult<()>;
 
     // --- Document Management ---
     async fn get_document_by_id(&self, document_id: Uuid) -> PortResult<Document>;
-    /// Creates a new document in the database for a given user.
-    async fn create_document(&self, user_id: Uuid, title: &str, original_text: &str) -> PortResult<Document>;
+    
+    async fn create_document(
+        &self,
+        user_id: Uuid,
+        title: &str,
+        original_text: &str,
+    ) -> PortResult<Document>;
 
-    // --- Session Management ---
+    // --- Session Management (Reading Sessions) ---
     async fn get_session_by_id(&self, session_id: Uuid) -> PortResult<Session>;
+    
     async fn create_session(&self, user_id: Uuid, document_id: Uuid) -> PortResult<Session>;
-    async fn update_session_progress(&self, session_id: Uuid, new_progress_index: usize) -> PortResult<()>;
+    
+    async fn update_session_progress(
+        &self,
+        session_id: Uuid,
+        new_progress_index: usize,
+    ) -> PortResult<()>;
 
     // --- Q&A and Note Management ---
     async fn save_qa_pair(&self, qa_pair: QAPair) -> PortResult<()>;
+    
     async fn get_qa_pairs_for_session(&self, session_id: Uuid) -> PortResult<Vec<QAPair>>;
+    
     async fn save_note(&self, note: Note) -> PortResult<()>;
+    
     async fn get_notes_for_session(&self, session_id: Uuid) -> PortResult<Vec<Note>>;
 }
 

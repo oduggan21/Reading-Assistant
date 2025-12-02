@@ -4,14 +4,12 @@ import {
   useRef,
   type ReactNode,
   useCallback,
-  useEffect,
   useState,
 } from "react";
 import { createStore, useStore } from "zustand";
-import { v4 as uuidv4 } from "uuid";
 import { useMutation } from "@tanstack/react-query";
 import { createSessionHandler } from "@reading-assistant/query/handlers/handlers";
-import type { CreateSessionResponse } from "@reading-assistant/query/api.schemas";
+import type { CreateSessionResponse } from "@reading-assistant/query/schemas";  // ✅ Updated import path
 import { WsClient } from "~/lib/ws-client";
 import { AudioPlayer } from "~/lib/audio-player";
 import { useVoiceRecorder } from "~/hooks/use-voice-recorder";
@@ -33,7 +31,7 @@ interface SessionState {
   status: SessionStatus;
   isInterruptible: boolean;
   sessionId: string | null;
-  userId: string | null;
+  // ❌ Removed userId - no longer needed
 }
 
 // Define the actions that can modify the state
@@ -41,7 +39,7 @@ interface SessionActions {
   setStatus: (status: SessionStatus) => void;
   setInterruptible: (isInterruptible: boolean) => void;
   setSessionId: (sessionId: string | null) => void;
-  setUserId: (userId: string | null) => void;
+  // ❌ Removed setUserId - no longer needed
   reset: () => void;
 }
 
@@ -51,11 +49,11 @@ const createSessionStore = () =>
     status: "idle",
     isInterruptible: false,
     sessionId: null,
-    userId: null,
+    // ❌ Removed userId - no longer needed
     setStatus: (status) => set({ status }),
     setInterruptible: (isInterruptible) => set({ isInterruptible }),
     setSessionId: (sessionId) => set({ sessionId }),
-    setUserId: (userId) => set({ userId }),
+    // ❌ Removed setUserId - no longer needed
     reset: () =>
       set({
         status: "idle",
@@ -84,28 +82,15 @@ type SessionProviderProps = { children: ReactNode };
 
 export function SessionProvider({ children }: SessionProviderProps) {
   const store = useRef(createSessionStore()).current;
-  
-  // ✅ Track if we're on the client to safely use localStorage
-  const [isClient, setIsClient] = useState(false);
 
   const wsClientRef = useRef<WsClient | null>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
 
-  // ✅ Set isClient to true after mount (client-side only)
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
+  // ✅ Updated mutation - no userId needed
   const { mutate: createSessionMutation, isPending: isUploading } = useMutation({
-    mutationFn: ({
-      formData,
-      userId,
-    }: {
-      formData: FormData;
-      userId: string;
-    }) => {
+    mutationFn: ({ formData }: { formData: FormData }) => {
       return createSessionHandler({
-        headers: { "x-user-id": userId, "Content-Type": "multipart/form-data" },
+        headers: { "Content-Type": "multipart/form-data" },
         data: formData,
       });
     },
@@ -116,23 +101,16 @@ export function SessionProvider({ children }: SessionProviderProps) {
       wsClientRef.current?.sendAudio(audioChunk);
     });
 
+  // ✅ Updated uploadDocument - removed localStorage userId logic
   const uploadDocument = useCallback((file: File) => {
-    // ✅ Only access localStorage on the client
-    if (typeof window === 'undefined') return;
-    
-    let userId = localStorage.getItem("reading-assistant-user-id");
-    if (!userId) {
-      userId = uuidv4();
-      localStorage.setItem("reading-assistant-user-id", userId);
-    }
-    store.getState().setUserId(userId);
     store.getState().setStatus("uploading");
 
     const formData = new FormData();
     formData.append("file", file);
 
+    // ✅ Cookie handles authentication automatically
     createSessionMutation(
-      { formData, userId },
+      { formData },
       {
         onSuccess: (data) => {
           store.getState().setSessionId(data.session_id); 
@@ -159,15 +137,13 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   const connect = useCallback(
     (sessionId: string) => {
-
-
       if (wsClientRef.current) return;
 
       store.getState().setSessionId(sessionId);
       store.getState().setStatus("connecting");
 
       const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
-      console.log("🔌 Connecting to WebSocket:", wsUrl, "Session ID:", sessionId); // ✅ Add t
+      console.log("🔌 Connecting to WebSocket:", wsUrl, "Session ID:", sessionId);
       wsClientRef.current = new WsClient(wsUrl);
       audioPlayerRef.current = new AudioPlayer();
 
@@ -193,15 +169,14 @@ export function SessionProvider({ children }: SessionProviderProps) {
       });
 
       wsClientRef.current.on("readingEnded", () => {
-      console.log("📢 Backend finished sending reading audio");
-      
-      // ✅ Specify we're waiting for the READING queue
-      audioPlayerRef.current?.onQueueEmpty(() => {
-        console.log("🎬 All reading audio has finished playing");
-        store.getState().setStatus("ended");
-        store.getState().setInterruptible(false);
-      }, 'reading'); // ✅ Specify 'reading' queue
-    });
+        console.log("📢 Backend finished sending reading audio");
+        
+        audioPlayerRef.current?.onQueueEmpty(() => {
+          console.log("🎬 All reading audio has finished playing");
+          store.getState().setStatus("ended");
+          store.getState().setInterruptible(false);
+        }, 'reading');
+      });
 
       wsClientRef.current.on("serverError", (message) => {
         console.error("Server Error:", message);
@@ -243,19 +218,19 @@ export function SessionProvider({ children }: SessionProviderProps) {
   );
 
   const startRecording = useCallback(() => {
-  const { status, isInterruptible } = store.getState();
-  if (
-    (status === "reading" || status === "listening") &&
-    isInterruptible
-  ) {
-    audioPlayerRef.current?.pause();
-    audioPlayerRef.current?.setAllowReadingPlayback(false); // ✅ Disable reading playback
-    wsClientRef.current?.sendInterruptStarted();
-    store.getState().setStatus("listening");
-    store.getState().setInterruptible(false);
-    startRecorder();
-  }
-}, [store, startRecorder]);
+    const { status, isInterruptible } = store.getState();
+    if (
+      (status === "reading" || status === "listening") &&
+      isInterruptible
+    ) {
+      audioPlayerRef.current?.pause();
+      audioPlayerRef.current?.setAllowReadingPlayback(false);
+      wsClientRef.current?.sendInterruptStarted();
+      store.getState().setStatus("listening");
+      store.getState().setInterruptible(false);
+      startRecorder();
+    }
+  }, [store, startRecorder]);
 
   const stopRecordingAndSend = useCallback(() => {
     stopRecorder();

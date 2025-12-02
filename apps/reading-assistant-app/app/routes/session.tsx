@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSession, SessionStatus } from "~/providers/session-provider";
-import { Loader2, Mic, MicOff, Pause, Play, X } from "lucide-react";
+import { useAuth } from "~/providers/auth-provider";  // ✅ Add this
+import { Loader2, Mic, Pause, Play, X } from "lucide-react";
 
 const statusMap: Record<SessionStatus, string> = {
   idle: "Idle",
@@ -18,6 +19,7 @@ const statusMap: Record<SessionStatus, string> = {
 export default function SessionPage() {
   const { id: sessionId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();  // ✅ Add this
   const {
     status,
     connect,
@@ -29,7 +31,14 @@ export default function SessionPage() {
     resumeReading,
   } = useSession();
   
-    const hasConnected = useRef(false);
+  const hasConnected = useRef(false);
+
+  // ✅ Add auth check
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -45,37 +54,36 @@ export default function SessionPage() {
     return () => {};
   }, [sessionId, connect, navigate]);
 
-  // ✅ Request microphone permission when component mounts
   useEffect(() => {
     const requestMicPermission = async () => {
       try {
-        // Request permission but immediately stop the stream
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Stop all tracks immediately - we just wanted the permission
         stream.getTracks().forEach(track => track.stop());
         console.log("✅ Microphone permission granted");
       } catch (error) {
         console.error("❌ Microphone permission denied:", error);
-        // You could show a toast notification here
       }
     };
 
     requestMicPermission();
   }, []);
-  // ✅ Handle press and hold for microphone
+
   const handleMicPress = () => {
-    // When pressed, start recording (will pause audio and enable mic)
     if ((status === "reading" || status === "listening") && !isRecording) {
       startRecording();
     }
   };
 
   const handleMicRelease = () => {
-    // When released, stop recording and send
     if (isRecording) {
       stopRecordingAndSend();
     }
   };
+
+  // ✅ Don't render if not authenticated
+  if (!user) {
+    return null;
+  }
 
   if (status === "connecting" || status === "idle") {
     return (
@@ -114,7 +122,6 @@ export default function SessionPage() {
       </main>
 
       <footer className="flex items-center gap-6">
-        {/* Pause/Resume Button */}
         <button
           onClick={() => {
             if (isPaused) {
@@ -130,13 +137,12 @@ export default function SessionPage() {
           {isPaused ? <Play className="h-8 w-8" /> : <Pause className="h-8 w-8" />}
         </button>
 
-        {/* Push-to-Talk Microphone Button */}
         <button
           onMouseDown={handleMicPress}
           onMouseUp={handleMicRelease}
-          onMouseLeave={handleMicRelease} // Also stop if mouse leaves button while pressed
-          onTouchStart={handleMicPress}   // Mobile support
-          onTouchEnd={handleMicRelease}   // Mobile support
+          onMouseLeave={handleMicRelease}
+          onTouchStart={handleMicPress}
+          onTouchEnd={handleMicRelease}
           disabled={!canInterrupt && !isRecording}
           className={`rounded-full p-8 transition-colors select-none ${
             isRecording ? "bg-red-600 scale-110" : "bg-blue-600"

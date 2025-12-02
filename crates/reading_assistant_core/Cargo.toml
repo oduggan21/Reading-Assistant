@@ -10,3 +10,4 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 futures = "0.3.30"
+chrono = "0.4.42"

@@ -19,6 +19,7 @@ path = "src/bin/openapi.rs"
 
 [dependencies]
 reading_assistant_core = { path = "../../crates/reading_assistant_core" }
+argon2 = "0.5.3"
 
 # Workspace-inherited dependencies
 tokio = { workspace = true }

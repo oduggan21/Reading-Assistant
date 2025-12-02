@@ -5,9 +5,11 @@ import type { AxiosInstance, AxiosRequestConfig } from 'axios';
 // The VITE_ prefix is important for security.
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-export const AXIOS_INSTANCE = Axios.create({ baseURL: API_URL });
+export const AXIOS_INSTANCE = Axios.create({ 
+  baseURL: API_URL,
+  withCredentials: true,  // ✅ CRITICAL: Send cookies with every request
+});
 
-// This is the function that our Orval-generated hooks will use.
 export const customInstance = <T>(
   config: AxiosRequestConfig,
   options?: AxiosRequestConfig,
@@ -19,8 +21,6 @@ export const customInstance = <T>(
     cancelToken: source.token,
   }).then(({ data }) => data);
 
-  // You can add cancellation logic here if needed by your application
-  // (e.g., in a useEffect cleanup function).
   // @ts-ignore
   promise.cancel = () => {
     source.cancel('Query was cancelled');
@@ -28,5 +28,4 @@ export const customInstance = <T>(
 
   return promise;
 };
-
 

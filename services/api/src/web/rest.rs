@@ -4,10 +4,12 @@
 //! definition for the OpenAPI specification.
 
 use crate::web::state::AppState;
+use crate::web::auth::{SignupRequest, LoginRequest, AuthResponse};
 use axum::{
     extract::{Multipart, State},
-    http::{HeaderMap, StatusCode},
+    http::{StatusCode},
     response::{IntoResponse, Json},
+    Extension,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -23,16 +25,24 @@ use uuid::Uuid;
 #[openapi(
     paths(
         create_session_handler,
+        crate::web::auth::signup_handler,    // Add
+        crate::web::auth::login_handler,     // Add
+        crate::web::auth::logout_handler,    // Add
     ),
     components(
-        schemas(CreateSessionResponse)
+        schemas(
+            CreateSessionResponse,
+            SignupRequest,      // Add
+            LoginRequest,       // Add
+            AuthResponse,       // Add
+        )
     ),
     tags(
-        (name = "Reading Assistant API", description = "API endpoints for the interactive audio reader.")
+        (name = "Reading Assistant API", description = "API endpoints for the interactive audio reader."),
+        (name = "Authentication", description = "User authentication endpoints"),  // Add
     )
 )]
 pub struct ApiDoc;
-
 //=========================================================================================
 // API Response and Payload Structs
 //=========================================================================================
@@ -51,43 +61,28 @@ pub struct CreateSessionResponse {
 
 /// Create a new session by uploading a document.
 ///
-/// Accepts a multipart/form-data request with a single file part.
-/// A `x-user-id` header is required to associate the session with a user.
+/// Requires authentication. The user_id is extracted from the auth session.
 #[utoipa::path(
     post,
     path = "/sessions",
     request_body(content_type = "multipart/form-data", description = "The document to upload."),
     responses(
         (status = 201, description = "Session created successfully", body = CreateSessionResponse),
-        (status = 400, description = "Bad request (e.g., missing header or file)"),
+        (status = 400, description = "Bad request (e.g., missing file)"),
+        (status = 401, description = "Unauthorized - no valid session"),
         (status = 500, description = "Internal server error")
     ),
-    params(
-        ("x-user-id" = Uuid, Header, description = "The unique ID of the user.")
+    security(
+        ("session_cookie" = [])
     )
 )]
 pub async fn create_session_handler(
     State(app_state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    Extension(user_id): Extension<Uuid>,  // ✅ From auth middleware
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let user_id_str = headers
-        .get("x-user-id")
-        .and_then(|v| v.to_str().ok())
-        .ok_or_else(|| {
-            (
-                StatusCode::BAD_REQUEST,
-                "x-user-id header is required".to_string(),
-            )
-        })?;
-
-    let user_id = Uuid::parse_str(user_id_str).map_err(|_| {
-        (
-            StatusCode::BAD_REQUEST,
-            "Invalid x-user-id format".to_string(),
-        )
-    })?;
-
+    // No need to parse headers or validate user anymore!
+    
     let (file_name, file_text) =
         if let Some(field) = multipart.next_field().await.map_err(|e| {
             (
@@ -118,7 +113,7 @@ pub async fn create_session_handler(
 
     let db = &app_state.db;
     let result = async {
-        db.get_or_create_user(user_id).await?;
+        // User already exists from signup/login, no need to get_or_create_user
         let doc = db.create_document(user_id, &file_name, &file_text).await?;
         db.create_session(user_id, doc.id).await
     }
@@ -142,4 +137,3 @@ pub async fn create_session_handler(
         }
     }
 }
-

@@ -4,6 +4,11 @@
   "private": true,
   "main": "./src/handlers/handlers.ts",
   "types": "./src/handlers/handlers.ts",
+  "exports": {
+    "./handlers": "./src/handlers/handlers.ts",
+    "./auth": "./src/crate-web-auth/crate-web-auth.ts",
+    "./schemas": "./src/api.schemas.ts"
+  },
   "scripts": {
     "build": "echo 'No build step configured yet'"
   },

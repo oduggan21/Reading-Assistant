@@ -9,24 +9,103 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "crate::web::auth"
+        ],
+        "summary": "POST /auth/login - Login with existing account",
+        "operationId": "login_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "crate::web::auth"
+        ],
+        "summary": "POST /auth/logout - Logout and invalidate session",
+        "operationId": "logout_handler",
+        "responses": {
+          "200": {
+            "description": "Logout successful"
+          },
+          "401": {
+            "description": "No active session"
+          }
+        }
+      }
+    },
+    "/auth/signup": {
+      "post": {
+        "tags": [
+          "crate::web::auth"
+        ],
+        "summary": "POST /auth/signup - Create a new user account",
+        "operationId": "signup_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
     "/sessions": {
       "post": {
         "tags": [],
         "summary": "Create a new session by uploading a document.",
-        "description": "Accepts a multipart/form-data request with a single file part.\nA `x-user-id` header is required to associate the session with a user.",
+        "description": "Requires authentication. The user_id is extracted from the auth session.",
         "operationId": "create_session_handler",
-        "parameters": [
-          {
-            "name": "x-user-id",
-            "in": "header",
-            "description": "The unique ID of the user.",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
         "requestBody": {
           "description": "The document to upload.",
           "content": {
@@ -45,17 +124,41 @@
             }
           },
           "400": {
-            "description": "Bad request (e.g., missing header or file)"
+            "description": "Bad request (e.g., missing file)"
+          },
+          "401": {
+            "description": "Unauthorized - no valid session"
           },
           "500": {
             "description": "Internal server error"
           }
-        }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
       }
     }
   },
   "components": {
     "schemas": {
+      "AuthResponse": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateSessionResponse": {
         "type": "object",
         "description": "The response payload sent after successfully creating a session.",
@@ -78,6 +181,36 @@
             "format": "uuid"
           }
         }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "SignupRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
       }
     }
   },
@@ -85,6 +218,10 @@
     {
       "name": "Reading Assistant API",
       "description": "API endpoints for the interactive audio reader."
+    },
+    {
+      "name": "Authentication",
+      "description": "User authentication endpoints"
     }
   ]
 }

@@ -8,7 +8,9 @@ use api_lib::{
     config::Config,
     error::ApiError,
     web::{
+        auth::{signup_handler, login_handler, logout_handler},
         create_session_handler, rest::ApiDoc, state::AppState, ws_handler,
+        middleware::require_auth,
     },
 };
 use async_openai::{
@@ -20,6 +22,7 @@ use axum::{
     extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
+    middleware as axum_middleware,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -28,7 +31,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 // ✅ Add these imports
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::CorsLayer;
+use axum::http::{Method, HeaderValue, header::{AUTHORIZATION, CONTENT_TYPE, ACCEPT}};
 
 #[tokio::main]
 async fn main() -> Result<(), ApiError> {
@@ -105,17 +109,33 @@ async fn main() -> Result<(), ApiError> {
     });
 
     let cors = CorsLayer::new()
-        .allow_origin(Any) // For development - allow any origin
-        .allow_methods(Any) // Allow all HTTP methods
-        .allow_headers(Any); // Allow all headers
-
+    .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
+    .allow_credentials(true)
+    .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+    .allow_headers([AUTHORIZATION, CONTENT_TYPE, ACCEPT]);
     // --- 6. Create the Web Router ---
-    let api_router = Router::new()
+  // Public routes (no auth required)
+    let public_routes = Router::new()
+        .route("/auth/signup", post(signup_handler))
+        .route("/auth/login", post(login_handler))
+        .route("/auth/logout", post(logout_handler));
+
+    // Protected routes (auth required)
+    let protected_routes = Router::new()
         .route("/sessions", post(create_session_handler))
         .route("/ws", get(ws_handler))
-        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
-        .layer(cors) // ✅ Add CORS layer here
-        .with_state(app_state);
+        .layer(axum_middleware::from_fn_with_state(
+            app_state.clone(),
+            require_auth,
+        ));
+
+// Combine API routes
+let api_router = Router::new()
+    .merge(public_routes)
+    .merge(protected_routes)
+    .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
+    .layer(cors)
+    .with_state(app_state);
 
     // Merge the API router with the Swagger UI router for a complete application.
     let app = Router::new()

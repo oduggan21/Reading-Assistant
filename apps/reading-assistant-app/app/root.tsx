@@ -10,6 +10,7 @@ import {
 import type { Route } from "./+types/root";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "~/providers/session-provider";
+import { AuthProvider } from "~/providers/auth-provider"; 
 import "./globals.css";
 
 // ✅ Fix: Return array directly, no parentheses wrapping
@@ -54,7 +55,7 @@ function getQueryClient() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const queryClient = useMemo(() => getQueryClient(), []);
-
+  
   return (
     <html lang="en" className="dark">
       <head>
@@ -63,7 +64,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
-          <SessionProvider>{children}</SessionProvider>
+          <AuthProvider>  {/* ✅ Add this */}
+            <SessionProvider>{children}</SessionProvider>
+          </AuthProvider>  {/* ✅ Add this */}
         </QueryClientProvider>
         <ScrollRestoration />
         <Scripts />
@@ -75,7 +78,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return <Outlet />;
 }
-
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let message = "Oops!";
   let details = "An unexpected error occurred.";
@@ -89,25 +91,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     stack = error.stack;
   }
 
+  // ❌ Remove the <html> wrapper - it's already provided by Layout
   return (
-    <html lang="en">
-      <head>
-        <title>{message}</title>
-        <Meta />
-        <Links />
-      </head>
-      <body>
-        <main className="flex h-screen flex-col items-center justify-center text-center">
-          <h1 className="text-4xl font-bold">{message}</h1>
-          <p className="mt-2 text-lg text-muted-foreground">{details}</p>
-          {stack && (
-            <pre className="mt-4 w-full max-w-2xl overflow-x-auto rounded-md bg-muted p-4 text-left text-sm">
-              <code>{stack}</code>
-            </pre>
-          )}
-        </main>
-        <Scripts />
-      </body>
-    </html>
+    <main className="flex h-screen flex-col items-center justify-center text-center">
+      <h1 className="text-4xl font-bold">{message}</h1>
+      <p className="mt-2 text-lg text-muted-foreground">{details}</p>
+      {stack && (
+        <pre className="mt-4 w-full max-w-2xl overflow-x-auto rounded-md bg-muted p-4 text-left text-sm">
+          <code>{stack}</code>
+        </pre>
+      )}
+    </main>
   );
 }

@@ -2,15 +2,23 @@
 import { useState, useEffect, useCallback, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "~/providers/session-provider";
-import { UploadCloud, Loader2, FileText, BookHeadphones } from "lucide-react";
+import { useAuth } from "~/providers/auth-provider";  // ✅ Add this
+import { UploadCloud, Loader2, FileText, BookHeadphones, LogOut } from "lucide-react";  // ✅ Add LogOut
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { uploadDocument, isUploading, sessionId } = useSession();
+  const { user, logout } = useAuth();  // ✅ Add this
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // ✅ Redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     if (sessionId) {
@@ -30,11 +38,26 @@ export default function HomePage() {
     }
   }, [selectedFile, isUploading, uploadDocument]);
 
+  // ✅ Add logout handler
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  // ✅ Don't render until auth is checked
+  if (!user) {
+    return null;
+  }
+
   return (
     <main className="min-h-[100svh] flex items-center justify-center px-4 py-10 bg-background relative">
-      {/* Theme toggles - top right (add later) */}
-      <div className="absolute top-1.5 right-1.5 flex flex-row gap-x-6">
-        {/* ThemeToggle and ThemeSelector will go here */}
+      {/* ✅ Add logout button */}
+      <div className="absolute top-4 right-4 flex items-center gap-4">
+        <span className="text-sm text-muted-foreground">{user.email}</span>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
       </div>
 
       <div className="w-full max-w-2xl">
@@ -49,7 +72,7 @@ export default function HomePage() {
 
           {/* Title */}
           <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">
-            Sage AI
+            Sage
           </h1>
 
           {/* Subtitle */}

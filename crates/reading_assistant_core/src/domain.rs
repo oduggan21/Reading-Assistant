@@ -4,6 +4,8 @@
 //! These structs are independent of any database or serialization format.
 
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
+
 
 /// Represents a single user session with a document.
 #[derive(Debug, Clone)]
@@ -22,10 +24,27 @@ pub struct Document {
     pub original_text: String,
 }
 
-/// Represents a user of the application.
-#[derive(Debug, Clone, Copy)]
+// Represents a user - used throughout app
+#[derive(Debug, Clone)]
 pub struct User {
     pub user_id: Uuid,
+    pub email: Option<String>,  // Optional because old users won't have it
+}
+
+// Only used internally for login/signup - contains sensitive data
+#[derive(Debug, Clone)]
+pub struct UserCredentials {
+    pub user_id: Uuid,
+    pub email: String,
+    pub hashed_password: String,
+}
+
+// Represents a browser login session (auth cookie)
+#[derive(Debug, Clone)]
+pub struct AuthSession {
+    pub id: String,
+    pub user_id: Uuid,
+    pub expires_at: DateTime<Utc>,
 }
 
 /// Represents a single question-and-answer exchange within a session.

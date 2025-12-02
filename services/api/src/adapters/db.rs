@@ -6,7 +6,7 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use reading_assistant_core::domain::{Document, Note, QAPair, Session, User};
+use reading_assistant_core::domain::{Document, Note, QAPair, Session, User, UserCredentials, AuthSession};
 use reading_assistant_core::ports::{DatabaseService, PortError, PortResult};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
@@ -38,15 +38,55 @@ impl DbAdapter {
 // "Impure" Database Record Structs
 //=========================================================================================
 
+// Update existing UserRecord to include email
 #[derive(FromRow)]
 struct UserRecord {
     user_id: Uuid,
+    email: Option<String>,      // Add this
     created_at: DateTime<Utc>,
 }
+
 impl UserRecord {
     fn to_domain(self) -> User {
         User {
             user_id: self.user_id,
+            email: self.email,      // Add this
+        }
+    }
+}
+
+// For login - fetches password too
+#[derive(FromRow)]
+struct UserWithPasswordRecord {
+    user_id: Uuid,
+    email: String,
+    hashed_password: String,
+}
+
+impl UserWithPasswordRecord {
+    fn to_domain(self) -> UserCredentials {
+        UserCredentials {
+            user_id: self.user_id,
+            email: self.email,
+            hashed_password: self.hashed_password,
+        }
+    }
+}
+
+// Auth session record - maps to auth_sessions table
+#[derive(FromRow)]
+struct AuthSessionRecord {
+    id: String,
+    user_id: Uuid,
+    expires_at: DateTime<Utc>,
+}
+
+impl AuthSessionRecord {
+    fn to_domain(self) -> AuthSession {
+        AuthSession {
+            id: self.id,
+            user_id: self.user_id,
+            expires_at: self.expires_at,
         }
     }
 }
@@ -135,7 +175,7 @@ impl DatabaseService for DbAdapter {
 
         let record = sqlx::query_as!(
             UserRecord,
-            "SELECT user_id, created_at FROM users WHERE user_id = $1",
+            "SELECT user_id, email, created_at FROM users WHERE user_id = $1",  // Add email here
             user_id
         )
         .fetch_one(&self.pool)
@@ -146,7 +186,7 @@ impl DatabaseService for DbAdapter {
         })?;
 
         Ok(record.to_domain())
-    }
+  }
 
     async fn get_document_by_id(&self, document_id: Uuid) -> PortResult<Document> {
         let record = sqlx::query_as!(
@@ -274,5 +314,95 @@ impl DatabaseService for DbAdapter {
 
         let notes = records.into_iter().map(|r| r.to_domain()).collect();
         Ok(notes)
+    }
+    async fn create_user_with_email(
+        &self,
+        email: &str,
+        hashed_password: &str,
+    ) -> PortResult<User> {
+        let user_id = Uuid::new_v4();
+        sqlx::query!(
+            "INSERT INTO users (user_id, email, hashed_password) VALUES ($1, $2, $3)",
+            user_id,
+            email,
+            hashed_password
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PortError::Unexpected(e.to_string()))?;
+        
+        Ok(User { 
+            user_id,
+            email: Some(email.to_string()),
+        })
+    }
+    
+    async fn get_user_by_email(&self, email: &str) -> PortResult<UserCredentials> {
+    let record = sqlx::query!(
+        "SELECT user_id, email, hashed_password FROM users WHERE email = $1",
+        email
+    )
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::RowNotFound => PortError::NotFound("User not found".to_string()),
+        _ => PortError::Unexpected(e.to_string()),
+    })?;
+    
+    // Handle optional email and password
+    let email = record.email.ok_or_else(|| {
+        PortError::Unexpected("User has no email".to_string())
+    })?;
+    
+    let hashed_password = record.hashed_password.ok_or_else(|| {
+        PortError::Unexpected("User has no password".to_string())
+    })?;
+    
+    Ok(UserCredentials {
+        user_id: record.user_id,
+        email,
+        hashed_password,
+    })
+  }
+    
+    async fn create_auth_session(
+        &self,
+        session_id: &str,
+        user_id: Uuid,
+        expires_at: DateTime<Utc>,
+    ) -> PortResult<()> {
+        sqlx::query!(
+            "INSERT INTO auth_sessions (id, user_id, expires_at) VALUES ($1, $2, $3)",
+            session_id,
+            user_id,
+            expires_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| PortError::Unexpected(e.to_string()))?;
+        Ok(())
+    }
+    
+    async fn validate_auth_session(&self, session_id: &str) -> PortResult<Uuid> {
+        let record = sqlx::query!(
+            "SELECT user_id FROM auth_sessions 
+             WHERE id = $1 AND expires_at > NOW()",
+            session_id
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => PortError::Unauthorized,
+            _ => PortError::Unexpected(e.to_string()),
+        })?;
+        Ok(record.user_id)
+    }
+    
+    async fn delete_auth_session(&self, session_id: &str) -> PortResult<()> {
+        sqlx::query!("DELETE FROM auth_sessions WHERE id = $1", session_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| PortError::Unexpected(e.to_string()))?;
+        Ok(())
     }
 }
