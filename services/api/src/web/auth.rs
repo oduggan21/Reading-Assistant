@@ -100,7 +100,7 @@ pub async fn signup_handler(
 
     // 6. Create session cookie
     let cookie = format!(
-        "session={}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={}",
+        "session={}; HttpOnly; SameSite=Lax; Path=/; Max-Age={}",
         auth_session_id,
         Duration::days(30).num_seconds()
     );
@@ -175,7 +175,7 @@ pub async fn login_handler(
 
     // 6. Create session cookie
     let cookie = format!(
-        "session={}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={}",
+        "session={}; HttpOnly; SameSite=Lax; Path=/; Max-Age={}",
         auth_session_id,
         Duration::days(30).num_seconds()
     );
@@ -232,7 +232,7 @@ pub async fn logout_handler(
         })?;
 
     // 4. Clear cookie
-    let cookie = "session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+    let cookie = "session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0";
 
     Ok((StatusCode::OK, [(header::SET_COOKIE, cookie.to_string())]))
 }
