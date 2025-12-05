@@ -4,6 +4,7 @@ import {
   useLoginHandler, 
   useLogoutHandler 
 } from "@reading-assistant/query/auth";
+import { useQueryClient } from "@tanstack/react-query"; // add this
 import type { AuthResponse } from "@reading-assistant/query/schemas";
 
 type AuthContextType = {
@@ -18,6 +19,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthResponse | null>(null);
+
+  
   
   const signupMutation = useSignupHandler();
   const loginMutation = useLoginHandler();

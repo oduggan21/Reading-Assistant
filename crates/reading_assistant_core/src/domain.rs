@@ -7,13 +7,14 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 
-/// Represents a single user session with a document.
 #[derive(Debug, Clone)]
 pub struct Session {
     pub id: Uuid,
     pub user_id: Uuid,
     pub document_id: Uuid,
     pub reading_progress_index: usize,
+    pub created_at: DateTime<Utc>,  // ✅ Add this
+    pub last_accessed_at: DateTime<Utc>,  // ✅ Add this
 }
 
 /// Represents a text document uploaded by a user.
@@ -62,4 +63,5 @@ pub struct Note {
     pub id: Uuid,
     pub session_id: Uuid,
     pub generated_note_text: String,
+    pub created_at: DateTime<Utc>,
 }

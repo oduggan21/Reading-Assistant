@@ -6,13 +6,15 @@ import { useAuth } from "~/providers/auth-provider";  // ✅ Add this
 import { UploadCloud, Loader2, FileText, BookHeadphones, LogOut } from "lucide-react";  // ✅ Add LogOut
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { useListSessionsHandler } from "@reading-assistant/query/handlers/handlers";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { uploadDocument, isUploading, sessionId } = useSession();
   const { user, logout } = useAuth();  // ✅ Add this
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
+  const {data: sessionsData} = useListSessionsHandler();
+ 
   // ✅ Redirect to login if not authenticated
   useEffect(() => {
     if (!user) {
@@ -32,6 +34,7 @@ export default function HomePage() {
     }
   };
 
+
   const handleUpload = useCallback(() => {
     if (selectedFile && !isUploading) {
       uploadDocument(selectedFile);
@@ -42,6 +45,17 @@ export default function HomePage() {
   const handleLogout = async () => {
     await logout();
     navigate("/login");
+  };
+
+  const handleExploreDashboard = () => {
+    const sessions = sessionsData?.sessions || [];
+    if (sessions.length > 0) {
+      // Navigate to most recent session
+      navigate(`/sessions/${sessions[0].session_id}`);
+    } else {
+      // No sessions yet, just reload home
+      navigate("/");
+    }
   };
 
   // ✅ Don't render until auth is checked
@@ -146,12 +160,13 @@ export default function HomePage() {
               </Button>
 
               <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate("/session/recent")}
-              >
-                Explore Dashboard
+                 type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExploreDashboard}
+                  disabled={!sessionsData || sessionsData.sessions.length === 0}
+                >
+                  {sessionsData?.sessions.length === 0 ? "No Sessions Yet" : "Explore Dashboard"}
               </Button>
             </div>
           </CardContent>

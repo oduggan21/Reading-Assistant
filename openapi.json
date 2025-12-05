@@ -101,6 +101,33 @@
       }
     },
     "/sessions": {
+      "get": {
+        "tags": [],
+        "operationId": "list_sessions_handler",
+        "responses": {
+          "200": {
+            "description": "Sessions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSessionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - no valid session"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      },
       "post": {
         "tags": [],
         "summary": "Create a new session by uploading a document.",
@@ -128,6 +155,50 @@
           },
           "401": {
             "description": "Unauthorized - no valid session"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "session_cookie": []
+          }
+        ]
+      }
+    },
+    "/sessions/{session_id}/notes": {
+      "get": {
+        "tags": [],
+        "operationId": "list_notes_handler",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "description": "Session ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notes retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNotesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Session not found"
           },
           "500": {
             "description": "Internal server error"
@@ -182,6 +253,34 @@
           }
         }
       },
+      "ListNotesResponse": {
+        "type": "object",
+        "required": [
+          "notes"
+        ],
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoteItem"
+            }
+          }
+        }
+      },
+      "ListSessionsResponse": {
+        "type": "object",
+        "required": [
+          "sessions"
+        ],
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionListItem"
+            }
+          }
+        }
+      },
       "LoginRequest": {
         "type": "object",
         "required": [
@@ -194,6 +293,52 @@
           },
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "NoteItem": {
+        "type": "object",
+        "required": [
+          "note_id",
+          "session_id",
+          "text",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "note_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionListItem": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "document_id",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

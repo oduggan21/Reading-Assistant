@@ -88,6 +88,8 @@ pub trait DatabaseService: Send + Sync {
     async fn save_note(&self, note: Note) -> PortResult<()>;
     
     async fn get_notes_for_session(&self, session_id: Uuid) -> PortResult<Vec<Note>>;
+
+    async fn get_sessions_by_user(&self, user_id: Uuid) -> PortResult<Vec<Session>>;
 }
 
 #[async_trait]
