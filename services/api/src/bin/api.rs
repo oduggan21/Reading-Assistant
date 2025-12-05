@@ -10,7 +10,7 @@ use api_lib::{
     web::{
         auth::{signup_handler, login_handler, logout_handler},
         create_session_handler, rest::ApiDoc, state::AppState, ws_handler,
-        middleware::require_auth,
+        middleware::require_auth, list_sessions_handler,list_notes_handler
     },
 };
 use async_openai::{
@@ -109,7 +109,7 @@ async fn main() -> Result<(), ApiError> {
     });
 
     let cors = CorsLayer::new()
-    .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
+    .allow_origin("http://localhost:3002".parse::<HeaderValue>().unwrap())
     .allow_credentials(true)
     .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
     .allow_headers([AUTHORIZATION, CONTENT_TYPE, ACCEPT]);
@@ -123,6 +123,8 @@ async fn main() -> Result<(), ApiError> {
     // Protected routes (auth required)
     let protected_routes = Router::new()
         .route("/sessions", post(create_session_handler))
+        .route("/sessions", get(list_sessions_handler))
+        .route("/sessions/{session_id}/notes", get(list_notes_handler))  
         .route("/ws", get(ws_handler))
         .layer(axum_middleware::from_fn_with_state(
             app_state.clone(),

@@ -25,6 +25,8 @@ use uuid::Uuid;
 #[openapi(
     paths(
         create_session_handler,
+        list_notes_handler,
+        list_sessions_handler, 
         crate::web::auth::signup_handler,    // Add
         crate::web::auth::login_handler,     // Add
         crate::web::auth::logout_handler,    // Add
@@ -32,6 +34,10 @@ use uuid::Uuid;
     components(
         schemas(
             CreateSessionResponse,
+            NoteItem,           // ✅ Add this
+            ListNotesResponse,
+            SessionListItem,        // ✅ Add this
+            ListSessionsResponse,
             SignupRequest,      // Add
             LoginRequest,       // Add
             AuthResponse,       // Add
@@ -53,6 +59,32 @@ pub struct CreateSessionResponse {
     session_id: Uuid,
     document_id: Uuid,
     user_id: Uuid,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SessionListItem {
+    session_id: Uuid,
+    document_id: Uuid,
+    created_at: String,  // ISO 8601 timestamp
+    // Add more fields as needed (document name, preview, etc.)
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ListSessionsResponse {
+    sessions: Vec<SessionListItem>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct NoteItem {
+    note_id: Uuid,
+    session_id: Uuid,
+    text: String,
+    created_at: String,  // ISO 8601 timestamp
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ListNotesResponse {
+    notes: Vec<NoteItem>,
 }
 
 //=========================================================================================
@@ -136,4 +168,107 @@ pub async fn create_session_handler(
             ))
         }
     }
+}
+
+ #[utoipa::path(
+    get,
+    path = "/sessions",
+    responses(
+        (status = 200, description = "Sessions retrieved successfully", body = ListSessionsResponse),
+        (status = 401, description = "Unauthorized - no valid session"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("session_cookie" = [])
+    )
+)]
+pub async fn list_sessions_handler(
+    State(app_state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let sessions = app_state
+        .db
+        .get_sessions_by_user(user_id)
+        .await
+        .map_err(|e| {
+            error!("Failed to fetch sessions: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch sessions".to_string())
+        })?;
+
+    let session_items: Vec<SessionListItem> = sessions
+        .into_iter()
+        .map(|s| SessionListItem {
+            session_id: s.id,
+            document_id: s.document_id,
+            created_at: s.created_at.to_rfc3339(),
+        })
+        .collect();
+
+    let response = ListSessionsResponse {
+        sessions: session_items,
+    };
+    
+    Ok((StatusCode::OK, Json(response)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/sessions/{session_id}/notes",
+    params(
+        ("session_id" = Uuid, Path, description = "Session ID")
+    ),
+    responses(
+        (status = 200, description = "Notes retrieved successfully", body = ListNotesResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("session_cookie" = [])
+    )
+)]
+pub async fn list_notes_handler(
+    State(app_state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    axum::extract::Path(session_id): axum::extract::Path<Uuid>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    // First, verify the session belongs to this user
+    let session = app_state
+        .db
+        .get_session_by_id(session_id)
+        .await
+        .map_err(|e| {
+            error!("Failed to get session: {:?}", e);
+            (StatusCode::NOT_FOUND, "Session not found".to_string())
+        })?;
+    
+    if session.user_id != user_id {
+        return Err((StatusCode::FORBIDDEN, "Access denied".to_string()));
+    }
+    
+    // Fetch notes for this session
+    let notes = app_state
+        .db
+        .get_notes_for_session(session_id)
+        .await
+        .map_err(|e| {
+            error!("Failed to fetch notes: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch notes".to_string())
+        })?;
+    
+    let note_items: Vec<NoteItem> = notes
+        .into_iter()
+        .map(|n| NoteItem {
+            note_id: n.id,
+            session_id: n.session_id,
+            text: n.generated_note_text,
+            created_at: n.created_at.to_rfc3339(),
+        })
+        .collect();
+    
+    let response = ListNotesResponse {
+        notes: note_items,
+    };
+    
+    Ok((StatusCode::OK, Json(response)))
 }

@@ -226,10 +226,18 @@ async fn generate_and_save_notes(app_state: Arc<AppState>, qapair: QAPair) {
         .await
     {
         Ok(note_text) => {
+            if note_text.trim() == "SKIP_NOTE" {
+            info!(
+                "Skipping note generation - question was unrelated for session {}",
+                qapair.session_id
+            );
+            return;
+            }
             let note = reading_assistant_core::domain::Note {
                 id: Uuid::new_v4(),
                 session_id: qapair.session_id,
                 generated_note_text: note_text,
+                created_at: chrono::Utc::now(), 
             };
             if app_state.db.save_note(note).await.is_err() {
                 error!(

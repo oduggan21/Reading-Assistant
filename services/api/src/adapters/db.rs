@@ -113,7 +113,10 @@ struct SessionRecord {
     user_id: Uuid,
     document_id: Uuid,
     reading_progress_index: i32,
+    created_at: chrono::DateTime<chrono::Utc>,  // ✅ Add this
+    last_accessed_at: chrono::DateTime<chrono::Utc>,  // ✅ Add this
 }
+
 impl SessionRecord {
     fn to_domain(self) -> Session {
         Session {
@@ -121,6 +124,8 @@ impl SessionRecord {
             user_id: self.user_id,
             document_id: self.document_id,
             reading_progress_index: self.reading_progress_index as usize,
+            created_at: self.created_at,  // ✅ Add this
+            last_accessed_at: self.last_accessed_at,  // ✅ Add this
         }
     }
 }
@@ -149,7 +154,7 @@ struct NoteRecord {
     id: Uuid,
     session_id: Uuid,
     generated_note_text: String,
-    created_at: DateTime<Utc>,
+    created_at: chrono::DateTime<chrono::Utc>, 
 }
 impl NoteRecord {
     fn to_domain(self) -> Note {
@@ -157,6 +162,7 @@ impl NoteRecord {
             id: self.id,
             session_id: self.session_id,
             generated_note_text: self.generated_note_text,
+            created_at: self.created_at,
         }
     }
 }
@@ -220,29 +226,36 @@ impl DatabaseService for DbAdapter {
     async fn get_session_by_id(&self, session_id: Uuid) -> PortResult<Session> {
         let record = sqlx::query_as!(
             SessionRecord,
-            "SELECT id, user_id, document_id, reading_progress_index FROM sessions WHERE id = $1",
+            "SELECT id, user_id, document_id, reading_progress_index, created_at, last_accessed_at 
+            FROM sessions 
+            WHERE id = $1",
             session_id
         )
         .fetch_one(&self.pool)
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => PortError::NotFound(format!("Session {} not found", session_id)),
+            sqlx::Error::RowNotFound => PortError::NotFound("Session not found".to_string()),
             _ => PortError::Unexpected(e.to_string()),
         })?;
+        
         Ok(record.to_domain())
     }
 
     async fn create_session(&self, user_id: Uuid, document_id: Uuid) -> PortResult<Session> {
-        let record = sqlx::query_as!(
-            SessionRecord,
-            "INSERT INTO sessions (user_id, document_id) VALUES ($1, $2) RETURNING id, user_id, document_id, reading_progress_index",
-            user_id,
-            document_id
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| PortError::Unexpected(e.to_string()))?;
-        Ok(record.to_domain())
+    let record = sqlx::query_as!(
+        SessionRecord,
+        "INSERT INTO sessions (id, user_id, document_id) 
+         VALUES ($1, $2, $3) 
+         RETURNING id, user_id, document_id, reading_progress_index, created_at, last_accessed_at",
+        Uuid::new_v4(),  // ✅ Generate ID here
+        user_id,
+        document_id
+    )
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| PortError::Unexpected(e.to_string()))?;
+    
+    Ok(record.to_domain())
     }
 
     async fn update_session_progress(
@@ -303,18 +316,21 @@ impl DatabaseService for DbAdapter {
     }
 
     async fn get_notes_for_session(&self, session_id: Uuid) -> PortResult<Vec<Note>> {
-        let records = sqlx::query_as!(
-            NoteRecord,
-            "SELECT id, session_id, generated_note_text, created_at FROM notes WHERE session_id = $1 ORDER BY created_at ASC",
-            session_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| PortError::Unexpected(e.to_string()))?;
+    let records = sqlx::query_as!(
+        NoteRecord,
+        "SELECT id, session_id, generated_note_text, created_at 
+         FROM notes 
+         WHERE session_id = $1 
+         ORDER BY created_at ASC",
+        session_id
+    )
+    .fetch_all(&self.pool)
+    .await
+    .map_err(|e| PortError::Unexpected(e.to_string()))?;
 
-        let notes = records.into_iter().map(|r| r.to_domain()).collect();
-        Ok(notes)
+    Ok(records.into_iter().map(|r| r.to_domain()).collect())
     }
+
     async fn create_user_with_email(
         &self,
         email: &str,
@@ -404,5 +420,21 @@ impl DatabaseService for DbAdapter {
             .await
             .map_err(|e| PortError::Unexpected(e.to_string()))?;
         Ok(())
+    }
+
+    async fn get_sessions_by_user(&self, user_id: Uuid) -> PortResult<Vec<Session>> {
+    let records = sqlx::query_as!(
+        SessionRecord,
+        "SELECT id, user_id, document_id, reading_progress_index, created_at, last_accessed_at
+         FROM sessions 
+         WHERE user_id = $1 
+         ORDER BY last_accessed_at DESC",
+        user_id
+    )
+    .fetch_all(&self.pool)
+    .await
+    .map_err(|e| PortError::Unexpected(e.to_string()))?;
+
+    Ok(records.into_iter().map(|r| r.to_domain()).collect())
     }
 }
