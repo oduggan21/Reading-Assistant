@@ -3,9 +3,11 @@ pub mod notes_llm;
 pub mod qa_llm;
 pub mod sst;
 pub mod tts;
+pub mod title_llm;
 
 pub use db::DbAdapter;
 pub use notes_llm::OpenAiNotesAdapter;
 pub use qa_llm::OpenAiQaAdapter;
 pub use sst::OpenAiSstAdapter;
 pub use tts::OpenAiTtsAdapter;
+pub use title_llm::OpenAiTitleAdapter;

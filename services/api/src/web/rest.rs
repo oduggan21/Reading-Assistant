@@ -65,6 +65,7 @@ pub struct CreateSessionResponse {
 pub struct SessionListItem {
     session_id: Uuid,
     document_id: Uuid,
+    title: Option<String>,
     created_at: String,  // ISO 8601 timestamp
     // Add more fields as needed (document name, preview, etc.)
 }
@@ -147,6 +148,11 @@ pub async fn create_session_handler(
     let result = async {
         // User already exists from signup/login, no need to get_or_create_user
         let doc = db.create_document(user_id, &file_name, &file_text).await?;
+
+        if let Ok(title) = app_state.title_adapter.generate_title_from_text(&file_text).await {
+            let _ = db.update_document_title(doc.id, &title).await;
+        }
+        
         db.create_session(user_id, doc.id).await
     }
     .await;
@@ -195,14 +201,23 @@ pub async fn list_sessions_handler(
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch sessions".to_string())
         })?;
 
-    let session_items: Vec<SessionListItem> = sessions
-        .into_iter()
-        .map(|s| SessionListItem {
-            session_id: s.id,
-            document_id: s.document_id,
-            created_at: s.created_at.to_rfc3339(),
-        })
-        .collect();
+    let mut session_items = Vec::new();
+    
+    // ✅ Fetch document title for each session
+    for session in sessions {
+        let document = app_state
+            .db
+            .get_document_by_id(session.document_id)
+            .await
+            .ok(); // Ignore errors, just use None for title
+        
+        session_items.push(SessionListItem {
+            session_id: session.id,
+            document_id: session.document_id,
+            title: document.and_then(|d| d.title),  // ✅ Get title from document
+            created_at: session.created_at.to_rfc3339(),
+        });
+    }
 
     let response = ListSessionsResponse {
         sessions: session_items,

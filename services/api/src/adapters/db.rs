@@ -96,13 +96,16 @@ struct DocumentRecord {
     id: Uuid,
     user_id: Uuid,
     original_text: String,
+    title: Option<String>,  // ✅ Add this
 }
+
 impl DocumentRecord {
     fn to_domain(self) -> Document {
         Document {
             id: self.id,
             user_id: self.user_id,
             original_text: self.original_text,
+            title: self.title,  // ✅ Add this
         }
     }
 }
@@ -194,35 +197,45 @@ impl DatabaseService for DbAdapter {
         Ok(record.to_domain())
   }
 
-    async fn get_document_by_id(&self, document_id: Uuid) -> PortResult<Document> {
-        let record = sqlx::query_as!(
-            DocumentRecord,
-            "SELECT id, user_id, original_text FROM documents WHERE id = $1",
-            document_id
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => PortError::NotFound(format!("Document {} not found", document_id)),
-            _ => PortError::Unexpected(e.to_string()),
-        })?;
-        Ok(record.to_domain())
-    }
 
-    async fn create_document(&self, user_id: Uuid, _title: &str, original_text: &str) -> PortResult<Document> {
-        let record = sqlx::query_as!(
-            DocumentRecord,
-            "INSERT INTO documents (id, user_id, original_text) VALUES ($1, $2, $3) RETURNING id, user_id, original_text",
-            Uuid::new_v4(),
-            user_id,
-            original_text
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| PortError::Unexpected(e.to_string()))?;
-        Ok(record.to_domain())
-    }
+ async fn get_document_by_id(&self, document_id: Uuid) -> PortResult<Document> {
+    let record = sqlx::query_as!(
+        DocumentRecord,
+        "SELECT id, user_id, original_text, title FROM documents WHERE id = $1",  // ✅ Add title
+        document_id
+    )
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::RowNotFound => PortError::NotFound("Document not found".to_string()),
+        _ => PortError::Unexpected(e.to_string()),
+    })?;
+    
+    Ok(record.to_domain())
+}
 
+ async fn create_document(
+    &self,
+    user_id: Uuid,
+    title: &str,
+    original_text: &str,
+) -> PortResult<Document> {
+    let record = sqlx::query_as!(
+        DocumentRecord,
+        "INSERT INTO documents (id, user_id, original_text, title) 
+         VALUES ($1, $2, $3, $4) 
+         RETURNING id, user_id, original_text, title",  // ✅ Add title to both INSERT and RETURNING
+        Uuid::new_v4(),
+        user_id,
+        original_text,
+        Some(title)  // ✅ Initially set to Some(title), will be updated after generation
+    )
+    .fetch_one(&self.pool)
+    .await
+    .map_err(|e| PortError::Unexpected(e.to_string()))?;
+    
+    Ok(record.to_domain())
+}
     async fn get_session_by_id(&self, session_id: Uuid) -> PortResult<Session> {
         let record = sqlx::query_as!(
             SessionRecord,
@@ -437,4 +450,17 @@ impl DatabaseService for DbAdapter {
 
     Ok(records.into_iter().map(|r| r.to_domain()).collect())
     }
+
+    async fn update_document_title(&self, document_id: Uuid, title: &str) -> PortResult<()> {
+    sqlx::query!(
+        "UPDATE documents SET title = $1 WHERE id = $2",
+        title,
+        document_id
+    )
+    .execute(&self.pool)
+    .await
+    .map_err(|e| PortError::Unexpected(e.to_string()))?;
+    
+    Ok(())
+}
 }

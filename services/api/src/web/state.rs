@@ -5,7 +5,7 @@
 use crate::config::Config;
 use reading_assistant_core::ports::{
     DatabaseService, NoteGenerationService, PortResult, QuestionAnsweringService,
-    SpeechToTextService, TextToSpeechService,
+    SpeechToTextService, TextToSpeechService,TitleGenerationService
 };
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken; // Import the CancellationToken
@@ -24,6 +24,7 @@ pub struct AppState {
     pub tts_adapter: Arc<dyn TextToSpeechService>,
     pub qa_adapter: Arc<dyn QuestionAnsweringService>,
     pub notes_adapter: Arc<dyn NoteGenerationService>,
+    pub title_adapter: Arc<dyn TitleGenerationService>,
 }
 
 //=========================================================================================

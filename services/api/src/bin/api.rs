@@ -3,7 +3,7 @@
 use api_lib::{
     adapters::{
         db::DbAdapter, notes_llm::OpenAiNotesAdapter, sst::OpenAiSstAdapter,
-        tts::OpenAiTtsAdapter, qa_llm::OpenAiQaAdapter,
+        tts::OpenAiTtsAdapter, qa_llm::OpenAiQaAdapter, title_llm::OpenAiTitleAdapter,
     },
     config::Config,
     error::ApiError,
@@ -98,6 +98,8 @@ async fn main() -> Result<(), ApiError> {
         config.note_model.clone(),
     ));
 
+    let title_adapter = Arc::new(OpenAiTitleAdapter::new(openai_client.clone()));  // ✅ Pass the client
+
     // --- 4. Build the Shared AppState ---
     let app_state = Arc::new(AppState {
         db: db_adapter,
@@ -106,6 +108,7 @@ async fn main() -> Result<(), ApiError> {
         tts_adapter,
         qa_adapter,
         notes_adapter,
+        title_adapter,
     });
 
     let cors = CorsLayer::new()
