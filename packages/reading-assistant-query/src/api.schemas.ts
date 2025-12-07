@@ -38,10 +38,13 @@ export interface NoteItem {
   text: string;
 }
 
+export type SessionListItemTitle = string | null;
+
 export interface SessionListItem {
   created_at: string;
   document_id: string;
   session_id: string;
+  title?: SessionListItemTitle;
 }
 
 export interface SignupRequest {

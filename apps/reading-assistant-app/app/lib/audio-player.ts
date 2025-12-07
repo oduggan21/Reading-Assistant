@@ -10,6 +10,7 @@ export class AudioPlayer {
   private currentSource: AudioBufferSourceNode | null = null;
   private onQueueEmptyCallback: (() => void) | null = null;
   private waitingForQueue: 'reading' | 'answering' | null = null;
+  private currentReadingSentenceIndex: number = 0;
 
   private allowReadingPlayback = true;
 
@@ -23,6 +24,10 @@ export class AudioPlayer {
 
   public addAnsweringChunk(data: ArrayBuffer): void {
     this.processAndQueueChunk(data, 'answering');
+  }
+
+  public getCurrentSentenceIndex(): number {
+    return this.currentReadingSentenceIndex;
   }
 
   public onQueueEmpty(callback: () => void, queueType: 'reading' | 'answering' = 'answering'): void {
@@ -103,7 +108,10 @@ private playFromQueues = (): void => {
     const source = this.audioContext.createBufferSource();
     source.buffer = bufferToPlay;
     source.connect(this.audioContext.destination);
-    source.onended = this.playFromQueues;
+    source.onended = () => {
+       this.currentReadingSentenceIndex++;
+       this.playFromQueues();
+    };
     source.start();
     this.currentSource = source;
   };

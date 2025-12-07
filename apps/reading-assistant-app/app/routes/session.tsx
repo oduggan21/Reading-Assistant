@@ -5,6 +5,7 @@ import { useAuth } from "~/providers/auth-provider";
 import { SessionListSidebar } from "~/components/session/session-list-sidebar";
 import { NotesGrid } from "~/components/session/notes-grid";
 import { Loader2, Mic, Pause, Play, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react"; 
 
 const statusMap: Record<SessionStatus, string> = {
   idle: "Idle",
@@ -33,7 +34,6 @@ export default function SessionPage() {
     resumeReading,
   } = useSession();
   
-  const hasConnected = useRef(false);
 
   // Auth check
   useEffect(() => {
@@ -43,19 +43,19 @@ export default function SessionPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (!sessionId) {
-      navigate("/");
-      return;
-    }
-    
-    if (!hasConnected.current) {
-      hasConnected.current = true;
-      connect(sessionId);
-    }
-    
-    return () => {};
-  }, [sessionId, connect, navigate]);
+  if (!sessionId) {
+    navigate("/");
+    return;
+  }
 
+  // Just call connect whenever sessionId changes.
+  // connect() is idempotent because it bails if a socket already exists.
+  connect(sessionId);
+
+  // ❌ IMPORTANT: do NOT call disconnect() in cleanup here.
+  // StrictMode will run this cleanup immediately once,
+  // which is what was closing the socket before .onopen fired.
+}, [sessionId, connect, navigate]);
   // Request microphone permission
   useEffect(() => {
     const requestMicPermission = async () => {
@@ -117,11 +117,14 @@ export default function SessionPage() {
           Status: <span className="font-bold">{statusMap[status]}</span>
         </div>
         <button
-          onClick={disconnect}
-          className="rounded-full bg-destructive/80 p-2 hover:bg-destructive"
-          title="End Session"
+          onClick={() => {
+            disconnect();
+            navigate("/");  // ✅ Navigate back to home
+          }}
+          className="rounded-full bg-muted p-2 hover:bg-muted/80"  // ✅ Changed styling (not destructive anymore)
+          title="Back to Home"  // ✅ Updated title
         >
-          <X className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" />  {/* ✅ Changed from X to ArrowLeft */}
         </button>
       </header>
 

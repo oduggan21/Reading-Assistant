@@ -23,8 +23,8 @@ pub struct Document {
     pub id: Uuid,
     pub user_id: Uuid,
     pub original_text: String,
+    pub title: Option<String>,  // ✅ Add this (Option because existing docs may not have titles)
 }
-
 // Represents a user - used throughout app
 #[derive(Debug, Clone)]
 pub struct User {

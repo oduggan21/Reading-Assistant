@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useCallback,
   useState,
+  useEffect,
 } from "react";
 import { createStore, useStore } from "zustand";
 import { useMutation } from "@tanstack/react-query";
@@ -114,7 +115,6 @@ export function SessionProvider({ children }: SessionProviderProps) {
       {
         onSuccess: (data) => {
           store.getState().setSessionId(data.session_id); 
-          connect(data.session_id);
         },
         onError: (error) => {
           console.error("Failed to create session:", error);
@@ -124,7 +124,29 @@ export function SessionProvider({ children }: SessionProviderProps) {
     );
   }, [createSessionMutation, store]);
 
+  const [playbackIndex, setPlaybackIndex] = useState(0);
+
+// ✅ Periodically sync playback index from audio player
+  useEffect(() => {
+  const interval = setInterval(() => {
+    if (audioPlayerRef.current) {
+      const currentIndex = audioPlayerRef.current.getCurrentSentenceIndex();
+      setPlaybackIndex(currentIndex);
+    }
+  }, 1000);  // Update every second
+  
+  return () => clearInterval(interval);
+}, []);
+
   const disconnect = useCallback(() => {
+
+    const currentPlaybackIndex = audioPlayerRef.current?.getCurrentSentenceIndex() || 0;
+  // ✅ Send to backend
+
+    const { sessionId: currentSessionId } = store.getState();
+
+    wsClientRef.current?.sendUpdateProgress(currentSessionId, currentPlaybackIndex);
+
     wsClientRef.current?.close();
     wsClientRef.current = null;
     audioPlayerRef.current?.stopAndClear();
@@ -136,20 +158,37 @@ export function SessionProvider({ children }: SessionProviderProps) {
   }, [isRecording, stopRecorder, store]);
 
   const connect = useCallback(
-    (sessionId: string) => {
-      if (wsClientRef.current) return;
+  (nextSessionId: string) => {
+    const { sessionId: currentSessionId } = store.getState();
 
-      store.getState().setSessionId(sessionId);
-      store.getState().setStatus("connecting");
+    // Already connected to this session → nothing to do
+    if (wsClientRef.current && currentSessionId === nextSessionId) {
+      return;
+    }
 
-      const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
-      console.log("🔌 Connecting to WebSocket:", wsUrl, "Session ID:", sessionId);
-      wsClientRef.current = new WsClient(wsUrl);
-      audioPlayerRef.current = new AudioPlayer();
+    if (wsClientRef.current && currentSessionId !== nextSessionId) {
+    console.log(`🔄 Session switch detected:`);
+    console.log(`  Current session: ${currentSessionId}`);
+    console.log(`  Next session: ${nextSessionId}`);
+    console.log(`  WebSocket state: ${wsClientRef.current ? 'CONNECTED' : 'NULL'}`);
+    console.log(`  WebSocket readyState: ${wsClientRef.current?.ws?.readyState}`);
+    console.log(`    0 = CONNECTING, 1 = OPEN, 2 = CLOSING, 3 = CLOSED`);
+    
+    disconnect();  // closes socket, clears audio, resets state
+    
+    console.log(`✅ Disconnected from session ${currentSessionId}`);
+  }
+    // Now actually connect to the new session
+    store.getState().setSessionId(nextSessionId);
+    store.getState().setStatus("connecting");
 
-      wsClientRef.current.on("open", () => {
-        wsClientRef.current?.sendInit(sessionId);
-      });
+    const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
+    wsClientRef.current = new WsClient(wsUrl);
+    audioPlayerRef.current = new AudioPlayer();
+
+    wsClientRef.current.on("open", () => {
+      wsClientRef.current?.sendInit(nextSessionId);
+    });
 
       wsClientRef.current.on("initialized", () => {
         // Backend will send ReadingStarted right after this.
@@ -207,10 +246,9 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
       });
 
-      wsClientRef.current.on("close", () => disconnect());
+      wsClientRef.current.on("close", () => {});
       wsClientRef.current.on("error", (error) => {
         console.error("WebSocket error:", error);
-        disconnect();
       });
       wsClientRef.current.connect();
     },
@@ -250,6 +288,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
     store.getState().setStatus("reading");
     wsClientRef.current?.sendResumeReading();
   }, []);
+
+
 
   return (
     <SessionContext.Provider

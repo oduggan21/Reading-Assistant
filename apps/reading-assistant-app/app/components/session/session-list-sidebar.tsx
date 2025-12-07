@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useListSessionsHandler } from "@reading-assistant/query/handlers/handlers";
+import { useSession } from "~/providers/session-provider";  
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Button } from "~/components/ui/button";
 import { FileText, Clock } from "lucide-react";
@@ -8,12 +9,23 @@ import { formatDistanceToNow } from "date-fns";
 export function SessionListSidebar() {
   const navigate = useNavigate();
   const { id: currentSessionId } = useParams();
+  const { disconnect, connect } = useSession(); 
   
   // Fetch all sessions for the authenticated user
   const { data: sessionsData, isLoading, error } = useListSessionsHandler();
   
   const handleSessionClick = (sessionId: string) => {
+    // ✅ Don't switch if clicking the current session
+    if (sessionId === currentSessionId) {
+      return;
+    }
+    disconnect();
+  
+    
+    // ✅ Navigate to new session
     navigate(`/sessions/${sessionId}`);
+    
+    // ✅ Connect will happen in session.tsx via useEffect when sessionId changes
   };
   
   if (isLoading) {
@@ -72,7 +84,7 @@ export function SessionListSidebar() {
                     {/* Content */}
                     <div className="flex-1 min-w-0 text-left">
                       <div className="font-medium text-sm truncate">
-                        Session {session.session_id.slice(0, 8)}
+                        {session.title || `Session ${session.session_id.slice(0, 8)}`}
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />

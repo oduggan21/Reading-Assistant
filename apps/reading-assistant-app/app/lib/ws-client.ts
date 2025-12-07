@@ -12,7 +12,8 @@ type ClientToServerMessage =
   | { type: "interrupt_started" }
   | { type: "interrupt_ended" }
   | { type: "pause_reading" }
-  | { type: "resume_reading" };
+  | { type: "resume_reading" }
+  | { type: "update_progress"; session_id: string, sentence_index: number };  // ✅ Add this
 
 // Messages sent FROM the Server TO the Client (browser)
 type ServerToClientMessage =
@@ -120,7 +121,9 @@ export class WsClient {
 
   public close(): void {
     if (this.ws) {
+      console.log("🛑 WsClient: Sending close frame to backend");
       this.ws.close();
+      console.log("✅ WsClient: Close frame sent");
     }
   }
 
@@ -182,6 +185,15 @@ export class WsClient {
 
   public sendResumeReading(): void {
     this.sendMessageToServer({ type: "resume_reading" });
+  }
+
+  // ✅ New method to send playback progress
+  public sendUpdateProgress(sessionId: string, sentenceIndex: number): void {
+    this.sendMessageToServer({ 
+      type: "update_progress", 
+      session_id: sessionId,
+      sentence_index: sentenceIndex 
+    });
   }
 
   public sendAudio(chunk: ArrayBuffer): void {

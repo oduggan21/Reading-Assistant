@@ -32,6 +32,8 @@ pub enum ClientMessage {
 
     /// A user-initiated command to pause the reading.
     PauseReading,
+
+    UpdateProgress { session_id: Uuid, sentence_index: usize },
 }
 
 //=========================================================================================

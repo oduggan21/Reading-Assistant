@@ -90,6 +90,8 @@ pub trait DatabaseService: Send + Sync {
     async fn get_notes_for_session(&self, session_id: Uuid) -> PortResult<Vec<Note>>;
 
     async fn get_sessions_by_user(&self, user_id: Uuid) -> PortResult<Vec<Session>>;
+
+    async fn update_document_title(&self, document_id: Uuid, title: &str) -> PortResult<()>;
 }
 
 #[async_trait]
@@ -119,4 +121,10 @@ pub trait QuestionAnsweringService: Send + Sync {
 pub trait NoteGenerationService: Send + Sync {
     /// Generates a concise note from a QAPair.
     async fn generate_note_from_qapair(&self, qapair: &QAPair) -> PortResult<String>;
+}
+
+#[async_trait]
+pub trait TitleGenerationService: Send + Sync {
+    /// Generates a concise title from document text.
+    async fn generate_title_from_text(&self, text: &str) -> PortResult<String>;
 }

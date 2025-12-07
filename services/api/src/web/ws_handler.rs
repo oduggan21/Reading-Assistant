@@ -292,6 +292,17 @@ async fn handle_text_message(
                 }
             }
         }
+        ClientMessage::UpdateProgress { session_id, sentence_index } => {
+            info!("Updating session progress to sentence {}", sentence_index);
+            
+            if let Err(e) = app_state
+                .db
+                .update_session_progress(session_id, sentence_index)
+                .await
+            {
+                error!("Failed to update session progress: {:?}", e);
+            }
+        }
             ClientMessage::Init { .. } => {
                 warn!("Received subsequent Init message, which is ignored.");
             }

@@ -339,6 +339,12 @@
           "session_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
