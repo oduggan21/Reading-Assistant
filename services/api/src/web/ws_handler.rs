@@ -83,21 +83,16 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>, user_id: Uui
                             error!("Failed to send session initialized message.");
                             return;
                         }
-                        let welcome_text = "Hi there! I am looking forward to discussing the information you have provided today! If at any point you have a question, please feel free to interrupt me, or if you need to pause our session, just click pause! I will now begin reading the information!";
-                
-                        match app_state.tts_adapter.generate_audio(welcome_text).await {
-                            Ok(welcome_audio) => {
-                                if ws_sender.lock().await.send(Message::Binary(welcome_audio.into())).await.is_err() {
-                                    error!("Failed to send welcome audio.");
-                                    return;
-                                }
-                            }
-                            Err(e) => {
-                                error!("Failed to generate welcome audio: {:?}", e);
-                                return;
-                            }
+
+                        {
+                            let mut session = session_state_lock.lock().await;
+                            session.current_mode = SessionMode::Paused;
                         }
-                    }
+                        
+                        let paused_msg = ServerMessage::ReadingPaused;
+                        let paused_json = serde_json::to_string(&paused_msg).unwrap();
+                        let _ = ws_sender.lock().await.send(Message::Text(paused_json.into())).await;
+                        }
                     Err(e) => {
                         error!("Failed to initialize session state: {:?}", e);
                         let err_msg = ServerMessage::Error {
@@ -121,21 +116,8 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>, user_id: Uui
 
     // --- 2. Main Message Loop ---
     // Rest of the function stays exactly the same...
-    let mut reading_task_handle: Option<JoinHandle<()>> = {
-        let session = session_state_lock.lock().await;
-        let task = {
-            let app_state = app_state.clone();
-            let session_state_lock = session_state_lock.clone();
-            let ws_sender = ws_sender.clone();
-            let token = session.cancellation_token.clone();
-            tokio::spawn(async move {
-                if let Err(e) = reading_process(app_state, session_state_lock, ws_sender, token).await {
-                    error!("Reading process failed: {:?}", e);
-                }
-            })
-        };
-        Some(task)
-    };
+  
+    let mut reading_task_handle: Option<JoinHandle<()>> = None;
 
     loop {
         if let Some(Ok(msg)) = receiver.next().await {
@@ -262,6 +244,7 @@ async fn handle_text_message(
             info!("ResumeReading message received.");
             let mut session = session_state_lock.lock().await;
             if session.current_mode == SessionMode::Paused {
+                info!("we entered paused block");
                 // Check if all audio already generated
                 if session.reading_progress_index >= session.chunked_document.len() {
                     info!("All audio already generated, just resuming frontend playback");
@@ -274,6 +257,7 @@ async fn handle_text_message(
                         error!("Failed to send empty audio trigger.");
                     }
                 } else {
+                    info!("We entered into the reading state");
                     // Still have sentences to generate
                     session.current_mode = SessionMode::Reading;
                     session.cancellation_token = CancellationToken::new();
