@@ -15,7 +15,7 @@ use api_lib::{
 };
 use async_openai::{
     config::OpenAIConfig,
-    types::{SpeechModel, Voice},
+    types::{audio::{SpeechModel, Voice}},
     Client,
 };
 use axum::{
@@ -85,7 +85,7 @@ async fn main() -> Result<(), ApiError> {
     };
     let tts_adapter = Arc::new(OpenAiTtsAdapter::new(
         openai_client.clone(),
-        SpeechModel::Tts1Hd,
+        SpeechModel:: Gpt4oMiniTts,
         tts_voice,
     ));
 

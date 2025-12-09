@@ -110,11 +110,6 @@ pub trait TextToSpeechService: Send + Sync {
 pub trait QuestionAnsweringService: Send + Sync {
     /// Answers a question based on a provided context.
     async fn answer_question(&self, question: &str, context: &str) -> PortResult<String>;
-    async fn answer_question_streaming(
-        &self,
-        question: &str,
-        context: &str,
-    ) -> PortResult<Pin<Box<dyn Stream<Item = Result<String, PortError>> + Send>>>;
 }
 
 #[async_trait]

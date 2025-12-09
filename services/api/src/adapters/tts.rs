@@ -5,7 +5,7 @@
 
 use async_openai::{
     config::OpenAIConfig,
-    types::{CreateSpeechRequest, SpeechModel, Voice},
+    types::{audio::{CreateSpeechRequest, SpeechModel, Voice}},
     Client, error::OpenAIError,
 };
 use async_trait::async_trait;
@@ -50,10 +50,12 @@ impl TextToSpeechService for OpenAiTtsAdapter {
         };
 
         // Call the API and manually map the error, which respects the orphan rule.
+        
         let response = self
             .client
             .audio()
-            .speech(request)
+            .speech()          // This returns a Speech struct (no arguments)
+            .create(request)   // Then call create() with the request
             .await
             .map_err(|e: OpenAIError| PortError::Unexpected(e.to_string()))?;
 

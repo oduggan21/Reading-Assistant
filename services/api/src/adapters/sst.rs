@@ -5,7 +5,7 @@
 
 use async_openai::{
     config::OpenAIConfig,
-    types::{AudioInput, CreateTranscriptionRequest},
+    types::{audio::{AudioInput, CreateTranscriptionRequest}},
     Client, error::OpenAIError,
 };
 use async_trait::async_trait;
@@ -75,7 +75,8 @@ impl SpeechToTextService for OpenAiSstAdapter {
         let response = self
             .client
             .audio()
-            .transcribe(request)
+            .transcription()
+            .create(request)
             .await
             .map_err(|e: OpenAIError| PortError::Unexpected(e.to_string()))?;
 

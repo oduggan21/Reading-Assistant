@@ -1,9 +1,9 @@
 use async_openai::{
     config::OpenAIConfig,
-    types::{
+    types::{chat::{
         ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
         ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
-    },
+    }},
     Client,
 };
 use async_trait::async_trait;
